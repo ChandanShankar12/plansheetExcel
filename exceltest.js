@@ -3,6 +3,7 @@ const { type } = require('os');
 const path = require('path');
 const { isExternal } = require('util/types');
 const ExcelJS = require('exceljs');
+const XLSX = require('xlsx');
 
 
 // async function modifyCellContent() {
@@ -43,31 +44,31 @@ const ExcelJS = require('exceljs');
 
 
 //Count the number of excel files in a directory
-function countExcelFiles(currentPath) {
-    try {
-        // Get all files in the directory
-        const files = fs.readdirSync(currentPath);
+// function countExcelFiles(currentPath) {
+//     try {
+//         // Get all files in the directory
+//         const files = fs.readdirSync(currentPath);
         
-        // Filter for Excel files (both .xlsx and .xls extensions)
-        const excelFiles = files.filter(file => {
-            const extension = path.extname(file).toLowerCase();
-            return extension === '.xlsx' || extension === '.xls';
-        });
+//         // Filter for Excel files (both .xlsx and .xls extensions)
+//         const excelFiles = files.filter(file => {
+//             const extension = path.extname(file).toLowerCase();
+//             return extension === '.xlsx' || extension === '.xls';
+//         });
         
-        return excelFiles.length;
-    } catch (error) {
-        console.error('Error reading directory:', error);
-        return 0;
-    }
-}
+//         return excelFiles.length;
+//     } catch (error) {
+//         console.error('Error reading directory:', error);
+//         return 0;
+//     }
+// }
 
 
 // Example usage
-const rootDirectory = './';
-const excelCount = countExcelFiles(rootDirectory);
-console.log(`Number of Excel files found: ${excelCount}`);
+// const rootDirectory = './';
+// const excelCount = countExcelFiles(rootDirectory);
+// console.log(`Number of Excel files found: ${excelCount}`);
 
-
+const mainRootFolder = path
 
 //Copy the content of the directory to a new folder
 async function copyContentToNewFolder(rootFolderPath, newFolderName) {
@@ -125,12 +126,69 @@ async function copyContentToNewFolder(rootFolderPath, newFolderName) {
 }
 
 // Example usage:
-const rootFolder = path.join(__dirname, 'Files'); // Change to your root folder path
-const newFolder = 'All Files';  // The new folder to create
+const copiedExcelRootFile = path.join(__dirname, 'Files'); // Change to your root folder path
+const newFolder = 'copiedExcelRootFile';  // The new folder to create
 copyContentToNewFolder('./Production Files', newFolder);
 
+// Root directory containing the Excel files
+const excelFileRootFolder = copiedExcelRootFile;
+const convertedFolder = path.join(__dirname, 'ConvertedFiles');
 
-async function processExcelFile(directoryPath = './Production Files/All Files') {
+// Step 1: Process root directory and copy Excel 2003 files
+function copyExcelFiles() {
+    // Add this check
+    if (!fs.existsSync(copiedExcelRootFile)) {
+        console.error(`Directory not found: ${copiedExcelRootFile}`);
+        return;
+    }
+
+    fs.readdirSync(copiedExcelRootFile).forEach((file) => {
+        const ext = path.extname(file).toLowerCase();
+        if (ext === '.xls') {
+            fs.copyFileSync(
+                path.join(copiedExcelRootFile, file), 
+                path.join(backupFolder, file)
+            );
+            console.log(`Copied: ${file}`);
+        }
+    });
+}
+
+// Step 2: Convert Excel files to newer version
+function convertExcelFiles() {
+    // Create converted folder if it doesn't exist
+    if (!fs.existsSync(convertedFolder)) {
+        fs.mkdirSync(convertedFolder, { recursive: true });
+    }
+
+    fs.readdirSync(copiedExcelRootFile).forEach((file) => {
+        const ext = path.extname(file).toLowerCase();
+        if (ext === '.xls') {
+            const oldPath = path.join(copiedExcelRootFile, file);
+            const workbook = XLSX.readFile(oldPath);
+
+            const newPath = path.join(convertedFolder, `${path.basename(file, ext)}.xlsx`);
+            XLSX.writeFile(workbook, newPath, { bookType: 'xlsx' });
+            console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
+        }
+    });
+}
+
+// Main function
+function automateExcelConversion() {
+    console.log('Step 1: Copying Excel 2003 files...');
+    copyExcelFiles();
+
+    console.log('Step 2: Converting files to newer Excel format...');
+    convertExcelFiles();
+
+    console.log('Task Completed!');
+}
+
+automateExcelConversion();
+
+
+async function processExcelFile(directoryPath = './Production Files/copiedExcelRootFile') {
     try {
         const files = fs.readdirSync(directoryPath);
         
@@ -148,13 +206,7 @@ async function processExcelFile(directoryPath = './Production Files/All Files') 
                 // Read the Excel file
                 const workbook = XLSX.readFile(filePath);
                 
-                // Get the first worksheet
-                const firstSheetName = workbook.SheetNames[0];
-                if (!firstSheetName) {
-                    throw new Error(`No worksheet found in ${file}`);
-                }
-                
-                const worksheet = workbook.Sheets[firstSheetName];
+                const worksheet = workbook.Sheets['Microplan H-t-H'];
                 
                 // Modify cell A1 (using XLSX notation)
                 worksheet['A1'] = { t: 's', v: '1234' };  // t:'s' means string type, v is the value
