@@ -1,1 +1,4 @@
+# Remove these conflict markers and combine the content
 node_modules
+node_modules/
+# ... rest of the gitignore content ...
