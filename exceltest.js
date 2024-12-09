@@ -344,3 +344,9 @@ async function main() {
 
 // Run the process
 main().catch(console.error);
+
+// Add this at the end of the file, before the main() function
+module.exports = ExcelProcessor;
+
+// Comment out or remove the automatic execution
+// main().catch(console.error);

@@ -1,15 +1,11 @@
 {
-  "dependencies": {
-    "exceljs": "^4.4.0",
-    "xlsx": "^0.18.5"
-  },
-  "name": "excel",
+  "name": "excel-processor",
   "version": "1.0.0",
-  "main": "exceltest.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "main": "server.js",
+  "dependencies": {
+    "exceljs": "^4.3.0",
+    "express": "^4.17.1",
+    "path": "^0.12.7",
+    "xlsx": "^0.18.5"
+  }
 }

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Excel Processor</title>
+</head>
+<body>
+    <h1>Excel File Processor</h1>
+    <button onclick="processExcel()">Process Excel Files</button>
+    <div id="status"></div>
+
+    <script>
+        function processExcel() {
+            document.getElementById('status').textContent = 'Processing...';
+            fetch('/process-excel', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').textContent = 
+                    data.success ? 'Processing completed!' : `Error: ${data.error}`;
+            })
+            .catch(error => {
+                document.getElementById('status').textContent = `Error: ${error.message}`;
+            });
+        }
+    </script>
+</body>
+</html> 
