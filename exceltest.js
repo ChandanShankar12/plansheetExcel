@@ -1,242 +1,346 @@
 const fs = require('fs');
-const { type } = require('os');
 const path = require('path');
-const { isExternal } = require('util/types');
+const XLSX = require('xlsx');
 const ExcelJS = require('exceljs');
 
-
-// async function modifyCellContent() {
-//     try {
-//       const workbook = new ExcelJS.Workbook();
-  
-//       // Load the file - make sure to use .xlsx format
-//       await workbook.xlsx.readFile('./Production Files/T2/Book1.xlsx');  // Changed extension to .xlsx
-  
-//       // Get the worksheet - add error checking
-//       const worksheet = workbook.worksheets[0];
-//     //   if (!worksheet) {
-//     //     throw new Error('No worksheet found in the workbook');
-//     //   }
-  
-//       // Log worksheet info for debugging
-//       console.log('Worksheet name:', worksheet.name);
-//       console.log('Number of worksheets:', workbook.worksheets.length);
-  
-//       // Rest of your code...
-//       const cell = worksheet.getRow(1).getCell(1); // This gets cell A1
-//       cell.value = '1234';
-  
-//     //   worksheet.getCell(1, 2).value = 'Another New Value';
-  
-//       // Save as xlsx
-//       await workbook.xlsx.writeFile('output.xlsx');
-  
-//       console.log('Excel file updated successfully!');
-//     } catch (error) {
-//       console.error('Error modifying Excel file:', error.message);
-//       console.error('Stack:', error.stack);  // Added for better error debugging
-//     }
-//   }
-
-// // Call the function
-// modifyCellContent();
-
-
-//Count the number of excel files in a directory
-// function countExcelFiles(currentPath) {
-//     try {
-//         // Get all files in the directory
-//         const files = fs.readdirSync(currentPath);
-        
-//         // Filter for Excel files (both .xlsx and .xls extensions)
-//         const excelFiles = files.filter(file => {
-//             const extension = path.extname(file).toLowerCase();
-//             return extension === '.xlsx' || extension === '.xls';
-//         });
-        
-//         return excelFiles.length;
-//     } catch (error) {
-//         console.error('Error reading directory:', error);
-//         return 0;
-//     }
-// }
-
-
-// Example usage
-// const rootDirectory = './';
-// const excelCount = countExcelFiles(rootDirectory);
-// console.log(`Number of Excel files found: ${excelCount}`);
-
-const mainRootFolder = path.join(__dirname, './');
-console.log(mainRootFolder);
-
-//Copy the content of the directory to a new folder
-async function copyContentToNewFolder(rootFolderPath, newFolderName) {
-    // Ensure the root folder exists
-    if (!fs.existsSync(rootFolderPath)) {
-        console.log("Root folder does not exist.");
-        return;
+class ExcelProcessor {
+    constructor(rootPath) {
+        this.rootPath = rootPath;
+        this.convertedPath = path.join(rootPath, 'convertedFiles');
+        this.stats = {
+            totalFiles: 0,
+            successful: 0,
+            failed: 0,
+            processedFiles: {
+                success: [],
+                failed: []
+            }
+        };
     }
 
-    // Check if folder already exists before proceeding with copy
-    const newFolderPath = path.join(rootFolderPath, newFolderName);
-    if (fs.existsSync(newFolderPath)) {
-        console.log(`The folder '${newFolderName}' already exists. Aborting copy operation.`);
-        return;
+    // Initialize and validate directories
+    async init() {
+        try {
+            if (!fs.existsSync(this.rootPath)) {
+                throw new Error(`Root directory ${this.rootPath} does not exist`);
+            }
+
+            // Clean or create convertedFiles directory
+            if (fs.existsSync(this.convertedPath)) {
+                console.log('Cleaning existing converted files directory...');
+                fs.rmSync(this.convertedPath, { recursive: true });
+            }
+            fs.mkdirSync(this.convertedPath);
+            console.log('✓ Initialized converted files directory');
+            return true;
+        } catch (error) {
+            console.error('✗ Initialization failed:', error.message);
+            return false;
+        }
     }
 
-    // Create the new folder
-    fs.mkdirSync(newFolderPath);
-    console.log(`New folder created: ${newFolderPath}`);
+    // Check if file is Excel format
+    isExcelFile(filename) {
+        const ext = path.extname(filename).toLowerCase();
+        return ext === '.xls' || ext === '.xlsx';
+    }
 
-    // Function to recursively find all files
-    function getAllFiles(dirPath) {
+    // Get all Excel files recursively
+    getAllExcelFiles(dirPath = this.rootPath) {
         let files = [];
         const items = fs.readdirSync(dirPath);
 
-        items.forEach(item => {
+        for (const item of items) {
             const fullPath = path.join(dirPath, item);
-            if (fs.statSync(fullPath).isDirectory()) {
-                files = files.concat(getAllFiles(fullPath));
-            } else {
+            if (fs.statSync(fullPath).isDirectory() && 
+                !fullPath.includes('convertedFiles')) {
+                files = files.concat(this.getAllExcelFiles(fullPath));
+            } else if (this.isExcelFile(item)) {
                 files.push(fullPath);
             }
-        });
-
+        }
         return files;
     }
 
-    try {
-        // Get all files from all subdirectories
-        const allFiles = getAllFiles(rootFolderPath).filter(file => 
-            !file.includes(newFolderName) // Exclude files from the new folder
-        );
+    // Process single Excel file
+    async processFile(filePath) {
+        const filename = path.basename(filePath);
+        const newPath = path.join(this.convertedPath, `${path.parse(filename).name}.xlsx`);
 
-        // Copy each file to the new folder
-        allFiles.forEach(filePath => {
-            const fileName = path.basename(filePath);
-            const destPath = path.join(newFolderPath, fileName);
-            fs.copyFileSync(filePath, destPath);
-            console.log(`Copied: ${fileName}`);
-        });
-
-        console.log('All files have been copied successfully');
-    } catch (error) {
-        console.error('Error copying files:', error);
-    }
-}
-
-// Example usage:
-const newFolder = 'copiedExcelRootFile';  // The new folder to create
-copyContentToNewFolder('./Production Files', newFolder);
-
-// Root directory containing the Excel files
-
-
-// Step 1: Process root directory and copy Excel 2003 files
-async function conversionExtension() {
-
-    //Create a new flder for the converted files
-   try {
-    const converterdFiles = path.join(mainRootFolder, 'convertedFiles');
-    if (!fs.existsSync(converterdFiles)) {
-        fs.mkdirSync(converterdFiles);
-        console.log(`New folder created: ${converterdFiles}`);
-    } else {
-        console.log(`The folder '${converterdFiles}' already exists.`);
-        return;
-    }
-    const convertersionFileDestination = path.join(mainRootFolder, '/Production Files/copiedExcelRootFile');
-    for (const file of fs.readdirSync(convertersionFileDestination)) {
-        const ext = path.extname(file).toLowerCase();
-        if (ext === '.xls' || ext === '.xlsx') {
-            const oldPath = path.join(copiedExcelRootFile, file.__dirname);
+        try {
             const workbook = new ExcelJS.Workbook();
-            try {
-                await workbook.xlsx.readFile(oldPath);
-                const newPath = path.join(converterdFiles, `${path.basename(file)}.xlsx`);
-                await workbook.xlsx.writeFile(workbook,newPath, { bookType: 'xlsx' });
-                console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
-            } catch (err) {
-                console.error(`Error converting ${file}: ${err.message}`);
-            }
+            await workbook.xlsx.readFile(filePath);
+            await workbook.xlsx.writeFile(newPath);
+            
+            this.stats.successful++;
+            this.stats.processedFiles.success.push(filename);
+            console.log(`✓ Converted: ${filename}`);
+            return true;
+        } catch (error) {
+            this.stats.failed++;
+            this.stats.processedFiles.failed.push({
+                file: filename,
+                error: error.message
+            });
+            console.error(`✗ Failed to convert ${filename}: ${error.message}`);
+            return false;
         }
     }
-    } catch (err) {
-    console.error('The Files cannot be converted');
+
+    // Generate processing report
+    generateReport() {
+        console.log('\n=== Excel Processing Report ===');
+        console.log(`Total files processed: ${this.stats.totalFiles}`);
+        console.log(`Successful conversions: ${this.stats.successful}`);
+        console.log(`Failed conversions: ${this.stats.failed}`);
+        
+        if (this.stats.failed > 0) {
+            console.log('\nFailed Files:');
+            this.stats.processedFiles.failed.forEach(failure => {
+                console.log(`- ${failure.file}: ${failure.error}`);
+            });
+        }
     }
 
+    // Process XLS file
+    async processXlsFile(filePath) {
+        const filename = path.basename(filePath);
+        const newPath = path.join(this.convertedPath, `${path.parse(filename).name}.xlsx`);
+
+        try {
+            // Step 1: Read XLS file using XLSX (better for old Excel formats)
+            const workbook = XLSX.readFile(filePath, {
+                cellStyles: true,
+                cellNF: true,
+                cellFormula: true
+            });
+
+            // Step 2: Convert to XLSX format
+            const tempPath = path.join(this.convertedPath, 'temp.xlsx');
+            XLSX.writeFile(workbook, tempPath);
+
+            // Step 3: Use ExcelJS to preserve additional formatting
+            const excelWorkbook = new ExcelJS.Workbook();
+            await excelWorkbook.xlsx.readFile(tempPath);
+
+            // Step 4: Process each worksheet
+            for (const worksheet of excelWorkbook.worksheets) {
+                // Preserve column widths
+                worksheet.columns.forEach(column => {
+                    column.width = column.width || 10;
+                });
+
+                // Preserve cell formats and formulas
+                worksheet.eachRow((row, rowNumber) => {
+                    row.eachCell((cell) => {
+                        if (cell.formula) {
+                            cell.value = { formula: cell.formula };
+                        }
+                    });
+                });
+            }
+
+            // Step 5: Save final version
+            await excelWorkbook.xlsx.writeFile(newPath);
+            
+            // Clean up temp file
+            fs.unlinkSync(tempPath);
+
+            this.stats.successful++;
+            this.stats.processedFiles.success.push(filename);
+            console.log(`✓ Converted: ${filename}`);
+            return true;
+
+        } catch (error) {
+            this.stats.failed++;
+            this.stats.processedFiles.failed.push({
+                file: filename,
+                error: error.message
+            });
+            console.error(`✗ Failed to convert ${filename}: ${error.message}`);
+            return false;
+        }
+    }
+
+    async selectiveConfigCopy(sourceWorkbook, targetWorkbook, options = {}) {
+        const defaultOptions = {
+            workbook: {
+                properties: true,
+                protection: true,
+                calcProperties: true,
+                customProperties: true,
+                definedNames: true
+            },
+            worksheet: {
+                properties: true,
+                pageSetup: true,
+                views: true,
+                columns: true,
+                rows: true,
+                protection: true,
+                autoFilter: true,
+                conditionalFormatting: true
+            },
+            cell: {
+                values: true,
+                formulas: true,
+                styles: true,
+                validation: true,
+                hyperlinks: true,
+                merges: true
+            }
+        };
+
+        // Merge user options with defaults
+        const configOptions = {
+            workbook: { ...defaultOptions.workbook, ...options.workbook },
+            worksheet: { ...defaultOptions.worksheet, ...options.worksheet },
+            cell: { ...defaultOptions.cell, ...options.cell }
+        };
+
+        try {
+            // Workbook Level Copying
+            if (configOptions.workbook.properties) {
+                console.log('Copying workbook properties...');
+                targetWorkbook.properties = {
+                    ...targetWorkbook.properties,
+                    ...sourceWorkbook.properties
+                };
+            }
+
+            // Process each worksheet
+            for (const sourceSheet of sourceWorkbook.worksheets) {
+                console.log(`Processing worksheet: ${sourceSheet.name}`);
+                const targetSheet = targetWorkbook.addWorksheet(sourceSheet.name);
+
+                // Worksheet Level Copying
+                if (configOptions.worksheet.properties) {
+                    console.log('- Copying worksheet properties');
+                    targetSheet.properties = {
+                        ...targetSheet.properties,
+                        ...sourceSheet.properties
+                    };
+                }
+
+                if (configOptions.worksheet.pageSetup) {
+                    console.log('- Copying page setup');
+                    targetSheet.pageSetup = sourceSheet.pageSetup;
+                }
+
+                if (configOptions.worksheet.views) {
+                    console.log('- Copying sheet views');
+                    targetSheet.views = sourceSheet.views;
+                }
+
+                // Column Level Copying
+                if (configOptions.worksheet.columns) {
+                    console.log('- Copying column configurations');
+                    sourceSheet.columns.forEach((col, index) => {
+                        if (col.width) {
+                            targetSheet.getColumn(index + 1).width = col.width;
+                        }
+                        if (col.hidden) {
+                            targetSheet.getColumn(index + 1).hidden = col.hidden;
+                        }
+                    });
+                }
+
+                // Row Level Copying
+                if (configOptions.worksheet.rows) {
+                    console.log('- Copying row configurations');
+                    sourceSheet.eachRow((row, rowNumber) => {
+                        const targetRow = targetSheet.getRow(rowNumber);
+                        targetRow.height = row.height;
+                        targetRow.hidden = row.hidden;
+                    });
+                }
+
+                // Cell Level Copying
+                sourceSheet.eachRow((row, rowNumber) => {
+                    row.eachCell((cell, colNumber) => {
+                        const targetCell = targetSheet.getCell(rowNumber, colNumber);
+
+                        if (configOptions.cell.values) {
+                            targetCell.value = cell.value;
+                        }
+
+                        if (configOptions.cell.formulas && cell.formula) {
+                            try {
+                                targetCell.value = { formula: cell.formula };
+                            } catch (e) {
+                                console.warn(`Warning: Could not copy formula in cell ${rowNumber},${colNumber}`);
+                            }
+                        }
+
+                        if (configOptions.cell.styles) {
+                            try {
+                                targetCell.style = cell.style;
+                            } catch (e) {
+                                console.warn(`Warning: Could not copy style in cell ${rowNumber},${colNumber}`);
+                            }
+                        }
+
+                        if (configOptions.cell.validation && cell.dataValidation) {
+                            try {
+                                targetCell.dataValidation = cell.dataValidation;
+                            } catch (e) {
+                                console.warn(`Warning: Could not copy validation in cell ${rowNumber},${colNumber}`);
+                            }
+                        }
+                    });
+                });
+
+                // Merge Cells
+                if (configOptions.cell.merges) {
+                    console.log('- Copying merged cells');
+                    sourceSheet.mergeCells.forEach(mergeCell => {
+                        try {
+                            targetSheet.mergeCells(mergeCell);
+                        } catch (e) {
+                            console.warn(`Warning: Could not merge cells ${mergeCell}`);
+                        }
+                    });
+                }
+            }
+
+            console.log('Selective configuration copy completed successfully');
+            return true;
+        } catch (error) {
+            console.error('Error during selective configuration copy:', error.message);
+            return false;
+        }
+    }
+
+    // Main process
+    async process() {
+        try {
+            await this.init();
+            const files = this.getAllExcelFiles();
+            this.stats.totalFiles = files.length;
+            console.log(`Found ${files.length} Excel files to process\n`);
+
+            for (const file of files) {
+                const ext = path.extname(file).toLowerCase();
+                if (ext === '.xls') {
+                    await this.processXlsFile(file);
+                } else {
+                    await this.processFile(file); // For .xlsx files
+                }
+            }
+
+            this.generateReport();
+        } catch (error) {
+            console.error('Process failed:', error.message);
+        }
+    }
 }
-// // Step 2: Convert Excel files to newer version
-// function convertExcelFiles() {
 
-
-//     fs.readdirSync(copiedExcelRootFile).forEach((file) => {
-//         const ext = path.extname(file).toLowerCase();
-//         if (ext === '.xls' || ext === '.xlsx') {
-//             const oldPath = path.join(copiedExcelRootFile, file);
-//             const workbook = XLSX.readFile(oldPath);
-            
-//             const convertedFolder = path.join(__dirname, 'ConvertedFiles');
-//             const newPath = path.join(convertedFolder, `${path.basename(file, ext)}.xlsx`);
-//             XLSX.writeFile(workbook, newPath, { bookType: 'xlsx' });
-//             console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
-//         }
-//     });
-// }
-
-// Main function
-function automateExcelConversion() {
-    console.log('Step 1: Copying Excel 2003 files...');
-    conversionExtension();
-
-    // console.log('Step 2: Converting files to newer Excel format...');
-    // convertExcelFiles();
-
-    console.log('Task Completed!');
+// Usage
+async function main() {
+    const rootDirectory = path.join(__dirname, './Production Files');
+    const processor = new ExcelProcessor(rootDirectory);
+    await processor.process();
 }
 
-automateExcelConversion();
-
-
-// async function processExcelFile(directoryPath = './Production Files/copiedExcelRootFile') {
-//     try {
-//         const files = fs.readdirSync(directoryPath);
-        
-//         for (const file of files) {
-//             const filePath = path.join(directoryPath, file);
-            
-//             // Skip if it's a directory
-//             if (fs.statSync(filePath).isDirectory()) continue;
-            
-//             // Check if it's an Excel file
-//             const ext = path.extname(file).toLowerCase();
-//             if (ext !== '.xls' && ext !== '.xlsx') continue;
-
-//             try {
-//                 // Read the Excel file
-//                 const workbook = XLSX.readFile(filePath);
-                
-//                 const worksheet = workbook.Sheets['Microplan H-t-H'];
-                
-//                 // Modify cell A1 (using XLSX notation)
-//                 worksheet['A1'] = { t: 's', v: '1234' };  // t:'s' means string type, v is the value
-                
-//                 // Write back to the same file
-//                 XLSX.writeFile(workbook, filePath);
-//                 console.log(`Excel file ${file} updated successfully!`);
-
-//             } catch (error) {
-//                 console.error(`Error processing Excel file ${file}:`, error.message);
-//             }
-//         }
-//     } catch (error) {
-//         console.error('Error reading directory:', error);
-//     }
-// }
-
-// // Call the async function
-// (async () => {
-//     await processExcelFile();
-// })();
-
+// Run the process
+main().catch(console.error);
