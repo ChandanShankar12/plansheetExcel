@@ -3,7 +3,6 @@ const { type } = require('os');
 const path = require('path');
 const { isExternal } = require('util/types');
 const ExcelJS = require('exceljs');
-const XLSX = require('xlsx');
 
 
 // async function modifyCellContent() {
@@ -68,7 +67,8 @@ const XLSX = require('xlsx');
 // const excelCount = countExcelFiles(rootDirectory);
 // console.log(`Number of Excel files found: ${excelCount}`);
 
-const mainRootFolder = path
+const mainRootFolder = path.join(__dirname, './');
+console.log(mainRootFolder);
 
 //Copy the content of the directory to a new folder
 async function copyContentToNewFolder(rootFolderPath, newFolderName) {
@@ -78,15 +78,16 @@ async function copyContentToNewFolder(rootFolderPath, newFolderName) {
         return;
     }
 
-    // Create the new folder if it doesn't exist
+    // Check if folder already exists before proceeding with copy
     const newFolderPath = path.join(rootFolderPath, newFolderName);
-    if (!fs.existsSync(newFolderPath)) {
-        fs.mkdirSync(newFolderPath);
-        console.log(`New folder created: ${newFolderPath}`);
-    } else {
-        console.log(`The folder '${newFolderName}' already exists.`);
+    if (fs.existsSync(newFolderPath)) {
+        console.log(`The folder '${newFolderName}' already exists. Aborting copy operation.`);
         return;
     }
+
+    // Create the new folder
+    fs.mkdirSync(newFolderPath);
+    console.log(`New folder created: ${newFolderPath}`);
 
     // Function to recursively find all files
     function getAllFiles(dirPath) {
@@ -126,61 +127,71 @@ async function copyContentToNewFolder(rootFolderPath, newFolderName) {
 }
 
 // Example usage:
-const copiedExcelRootFile = path.join(__dirname, 'Files'); // Change to your root folder path
 const newFolder = 'copiedExcelRootFile';  // The new folder to create
 copyContentToNewFolder('./Production Files', newFolder);
 
 // Root directory containing the Excel files
-const excelFileRootFolder = copiedExcelRootFile;
-const convertedFolder = path.join(__dirname, 'ConvertedFiles');
+
 
 // Step 1: Process root directory and copy Excel 2003 files
-function copyExcelFiles() {
-    // Add this check
-    if (!fs.existsSync(copiedExcelRootFile)) {
-        console.error(`Directory not found: ${copiedExcelRootFile}`);
+async function conversionExtension() {
+
+    //Create a new flder for the converted files
+   try {
+    const converterdFiles = path.join(mainRootFolder, 'convertedFiles');
+    if (!fs.existsSync(converterdFiles)) {
+        fs.mkdirSync(converterdFiles);
+        console.log(`New folder created: ${converterdFiles}`);
+    } else {
+        console.log(`The folder '${converterdFiles}' already exists.`);
         return;
     }
-
-    fs.readdirSync(copiedExcelRootFile).forEach((file) => {
+    const convertersionFileDestination = path.join(mainRootFolder, '/Production Files/copiedExcelRootFile');
+    for (const file of fs.readdirSync(convertersionFileDestination)) {
         const ext = path.extname(file).toLowerCase();
-        if (ext === '.xls') {
-            fs.copyFileSync(
-                path.join(copiedExcelRootFile, file), 
-                path.join(backupFolder, file)
-            );
-            console.log(`Copied: ${file}`);
+        if (ext === '.xls' || ext === '.xlsx') {
+            const oldPath = path.join(copiedExcelRootFile, file.__dirname);
+            const workbook = new ExcelJS.Workbook();
+            try {
+                await workbook.xlsx.readFile(oldPath);
+                const newPath = path.join(converterdFiles, `${path.basename(file)}.xlsx`);
+                await workbook.xlsx.writeFile(workbook,newPath, { bookType: 'xlsx' });
+                console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
+            } catch (err) {
+                console.error(`Error converting ${file}: ${err.message}`);
+            }
         }
-    });
-}
-
-// Step 2: Convert Excel files to newer version
-function convertExcelFiles() {
-    // Create converted folder if it doesn't exist
-    if (!fs.existsSync(convertedFolder)) {
-        fs.mkdirSync(convertedFolder, { recursive: true });
+    }
+    } catch (err) {
+    console.error('The Files cannot be converted');
     }
 
-    fs.readdirSync(copiedExcelRootFile).forEach((file) => {
-        const ext = path.extname(file).toLowerCase();
-        if (ext === '.xls') {
-            const oldPath = path.join(copiedExcelRootFile, file);
-            const workbook = XLSX.readFile(oldPath);
-
-            const newPath = path.join(convertedFolder, `${path.basename(file, ext)}.xlsx`);
-            XLSX.writeFile(workbook, newPath, { bookType: 'xlsx' });
-            console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
-        }
-    });
 }
+// // Step 2: Convert Excel files to newer version
+// function convertExcelFiles() {
+
+
+//     fs.readdirSync(copiedExcelRootFile).forEach((file) => {
+//         const ext = path.extname(file).toLowerCase();
+//         if (ext === '.xls' || ext === '.xlsx') {
+//             const oldPath = path.join(copiedExcelRootFile, file);
+//             const workbook = XLSX.readFile(oldPath);
+            
+//             const convertedFolder = path.join(__dirname, 'ConvertedFiles');
+//             const newPath = path.join(convertedFolder, `${path.basename(file, ext)}.xlsx`);
+//             XLSX.writeFile(workbook, newPath, { bookType: 'xlsx' });
+//             console.log(`Converted: ${file} --> ${path.basename(newPath)}`);
+//         }
+//     });
+// }
 
 // Main function
 function automateExcelConversion() {
     console.log('Step 1: Copying Excel 2003 files...');
-    copyExcelFiles();
+    conversionExtension();
 
-    console.log('Step 2: Converting files to newer Excel format...');
-    convertExcelFiles();
+    // console.log('Step 2: Converting files to newer Excel format...');
+    // convertExcelFiles();
 
     console.log('Task Completed!');
 }
@@ -188,44 +199,44 @@ function automateExcelConversion() {
 automateExcelConversion();
 
 
-async function processExcelFile(directoryPath = './Production Files/copiedExcelRootFile') {
-    try {
-        const files = fs.readdirSync(directoryPath);
+// async function processExcelFile(directoryPath = './Production Files/copiedExcelRootFile') {
+//     try {
+//         const files = fs.readdirSync(directoryPath);
         
-        for (const file of files) {
-            const filePath = path.join(directoryPath, file);
+//         for (const file of files) {
+//             const filePath = path.join(directoryPath, file);
             
-            // Skip if it's a directory
-            if (fs.statSync(filePath).isDirectory()) continue;
+//             // Skip if it's a directory
+//             if (fs.statSync(filePath).isDirectory()) continue;
             
-            // Check if it's an Excel file
-            const ext = path.extname(file).toLowerCase();
-            if (ext !== '.xls' && ext !== '.xlsx') continue;
+//             // Check if it's an Excel file
+//             const ext = path.extname(file).toLowerCase();
+//             if (ext !== '.xls' && ext !== '.xlsx') continue;
 
-            try {
-                // Read the Excel file
-                const workbook = XLSX.readFile(filePath);
+//             try {
+//                 // Read the Excel file
+//                 const workbook = XLSX.readFile(filePath);
                 
-                const worksheet = workbook.Sheets['Microplan H-t-H'];
+//                 const worksheet = workbook.Sheets['Microplan H-t-H'];
                 
-                // Modify cell A1 (using XLSX notation)
-                worksheet['A1'] = { t: 's', v: '1234' };  // t:'s' means string type, v is the value
+//                 // Modify cell A1 (using XLSX notation)
+//                 worksheet['A1'] = { t: 's', v: '1234' };  // t:'s' means string type, v is the value
                 
-                // Write back to the same file
-                XLSX.writeFile(workbook, filePath);
-                console.log(`Excel file ${file} updated successfully!`);
+//                 // Write back to the same file
+//                 XLSX.writeFile(workbook, filePath);
+//                 console.log(`Excel file ${file} updated successfully!`);
 
-            } catch (error) {
-                console.error(`Error processing Excel file ${file}:`, error.message);
-            }
-        }
-    } catch (error) {
-        console.error('Error reading directory:', error);
-    }
-}
+//             } catch (error) {
+//                 console.error(`Error processing Excel file ${file}:`, error.message);
+//             }
+//         }
+//     } catch (error) {
+//         console.error('Error reading directory:', error);
+//     }
+// }
 
-// Call the async function
-(async () => {
-    await processExcelFile();
-})();
+// // Call the async function
+// (async () => {
+//     await processExcelFile();
+// })();
 

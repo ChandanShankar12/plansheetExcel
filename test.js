@@ -1,3 +1,3 @@
 const path = require('path');
 
-console.log(path.directoryPath)
+console.log(__dirname)
