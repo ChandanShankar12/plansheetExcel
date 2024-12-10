@@ -23,7 +23,7 @@ class ExcelProcessor {
         try {
             if (!fs.existsSync(this.rootPath)) {
                 throw new Error(`Root directory ${this.rootPath} does not exist`);
-            }
+            } 
 
             // Clean or create convertedFiles directory
             if (fs.existsSync(this.convertedPath)) {
@@ -331,6 +331,156 @@ class ExcelProcessor {
             this.generateReport();
         } catch (error) {
             console.error('Process failed:', error.message);
+        }
+    }
+
+    async copyStylesBetweenFiles(sourcePath, targetPath) {
+        try {
+            console.log('\n=== Starting Custom Style Transfer Process ===');
+            
+            // Validate file paths
+            if (!fs.existsSync(sourcePath)) {
+                throw new Error(`Source file does not exist: ${sourcePath}`);
+            }
+            if (!fs.existsSync(targetPath)) {
+                throw new Error(`Target file does not exist: ${targetPath}`);
+            }
+
+            // Validate file extensions
+            const sourceExt = path.extname(sourcePath).toLowerCase();
+            const targetExt = path.extname(targetPath).toLowerCase();
+            
+            if (!['.xls', '.xlsx'].includes(sourceExt)) {
+                throw new Error('Source file must be an Excel file (.xls or .xlsx)');
+            }
+            if (!['.xls', '.xlsx'].includes(targetExt)) {
+                throw new Error('Target file must be an Excel file (.xls or .xlsx)');
+            }
+
+            // If source is .xls, convert it first
+            let processedSourcePath = sourcePath;
+            if (sourceExt === '.xls') {
+                console.log('Converting source .xls file...');
+                const tempPath = path.join(this.convertedPath, `temp_${Date.now()}.xlsx`);
+                await this.processXlsFile(sourcePath, tempPath);
+                processedSourcePath = tempPath;
+            }
+
+            // Load source workbook
+            console.log('Loading source workbook...');
+            const sourceWorkbook = new ExcelJS.Workbook();
+            await sourceWorkbook.xlsx.readFile(processedSourcePath);
+
+            // Load target workbook
+            console.log('Loading target workbook...');
+            const targetWorkbook = new ExcelJS.Workbook();
+            await targetWorkbook.xlsx.readFile(targetPath);
+
+            // Copy styles and formatting
+            console.log('Copying styles and formatting...');
+            
+            // Copy workbook-level properties
+            targetWorkbook.properties = { ...targetWorkbook.properties, ...sourceWorkbook.properties };
+            
+            // Process each worksheet
+            for (const sourceSheet of sourceWorkbook.worksheets) {
+                console.log(`- Processing worksheet: ${sourceSheet.name}`);
+                
+                // Get or create target worksheet
+                let targetSheet = targetWorkbook.getWorksheet(sourceSheet.name);
+                if (!targetSheet) {
+                    targetSheet = targetWorkbook.addWorksheet(sourceSheet.name);
+                }
+
+                // Copy worksheet properties
+                targetSheet.properties = { ...targetSheet.properties, ...sourceSheet.properties };
+
+                // Copy column properties
+                sourceSheet.columns.forEach((col, index) => {
+                    const targetCol = targetSheet.getColumn(index + 1);
+                    targetCol.width = col.width;
+                    targetCol.hidden = col.hidden;
+                    targetCol.outlineLevel = col.outlineLevel;
+                });
+
+                // Copy row properties and cell styles
+                sourceSheet.eachRow((sourceRow, rowNumber) => {
+                    const targetRow = targetSheet.getRow(rowNumber);
+                    
+                    // Copy row properties
+                    targetRow.height = sourceRow.height;
+                    targetRow.hidden = sourceRow.hidden;
+                    targetRow.outlineLevel = sourceRow.outlineLevel;
+
+                    // Copy cell styles and content
+                    sourceRow.eachCell((sourceCell, colNumber) => {
+                        const targetCell = targetRow.getCell(colNumber);
+                        
+                        // Copy value or formula
+                        if (sourceCell.formula) {
+                            targetCell.value = { formula: sourceCell.formula };
+                        } else {
+                            targetCell.value = sourceCell.value;
+                        }
+
+                        // Copy styles
+                        targetCell.style = JSON.parse(JSON.stringify(sourceCell.style));
+                        
+                        // Copy data validation
+                        if (sourceCell.dataValidation) {
+                            targetCell.dataValidation = sourceCell.dataValidation;
+                        }
+
+                        // Copy hyperlinks
+                        if (sourceCell.hyperlink) {
+                            targetCell.hyperlink = sourceCell.hyperlink;
+                        }
+                    });
+                });
+
+                // Copy merged cells
+                sourceSheet.mergeCells.forEach(mergeCell => {
+                    try {
+                        targetSheet.mergeCells(mergeCell);
+                    } catch (e) {
+                        console.warn(`  Warning: Could not merge cells ${mergeCell}`);
+                    }
+                });
+
+                // Copy conditional formatting
+                if (sourceSheet.conditionalFormattings) {
+                    targetSheet.conditionalFormattings = sourceSheet.conditionalFormattings;
+                }
+            }
+
+            // Save the target workbook
+            console.log('Saving target workbook...');
+            await targetWorkbook.xlsx.writeFile(targetPath);
+
+            // Clean up temporary file if created
+            if (processedSourcePath !== sourcePath) {
+                fs.unlinkSync(processedSourcePath);
+            }
+
+            console.log('\n✓ Style transfer completed successfully');
+            console.log(`Source: ${path.basename(sourcePath)}`);
+            console.log(`Target: ${path.basename(targetPath)}`);
+            
+            return {
+                success: true,
+                message: 'Style transfer completed successfully',
+                sourcePath,
+                targetPath
+            };
+
+        } catch (error) {
+            console.error('✗ Style transfer failed:', error.message);
+            return {
+                success: false,
+                error: error.message,
+                sourcePath,
+                targetPath
+            };
         }
     }
 }

@@ -2,25 +2,78 @@
 <html>
 <head>
     <title>Excel Processor</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Excel File Processor</h1>
-    <button onclick="processExcel()">Process Excel Files</button>
-    <div id="status"></div>
+    <div class="container">
+        <h1>Excel File Processor</h1>
+        
+        <div class="input-group">
+            <label for="folderPath">Select Processing Folder:</label>
+            <input type="text" id="folderPath" placeholder="Enter folder path" />
+            <button onclick="browseFolder()">Browse</button>
+        </div>
+
+        <button onclick="processExcel()">Process Excel Files</button>
+        
+        <div id="status" class="status"></div>
+        
+        <div id="result" style="display: none;">
+            <h3>Processing Results:</h3>
+            <div id="conversionDetails"></div>
+        </div>
+    </div>
 
     <script>
+        function browseFolder() {
+            const path = prompt("Enter the folder path:", "");
+            if (path) {
+                document.getElementById('folderPath').value = path;
+            }
+        }
+
         function processExcel() {
-            document.getElementById('status').textContent = 'Processing...';
+            const folderPath = document.getElementById('folderPath').value;
+            if (!folderPath) {
+                alert('Please select a folder first');
+                return;
+            }
+
+            const status = document.getElementById('status');
+            status.className = 'status processing';
+            status.textContent = 'Processing...';
+
             fetch('/process-excel', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ folderPath })
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById('status').textContent = 
-                    data.success ? 'Processing completed!' : `Error: ${data.error}`;
+                if (data.success) {
+                    status.className = 'status success';
+                    status.textContent = 'Processing completed successfully!';
+                    
+                    const resultDiv = document.getElementById('result');
+                    const detailsDiv = document.getElementById('conversionDetails');
+                    resultDiv.style.display = 'block';
+                    
+                    detailsDiv.innerHTML = `
+                        <p>Total files processed: ${data.stats.totalFiles}</p>
+                        <p>Successfully converted: ${data.stats.successful}</p>
+                        <p>Failed conversions: ${data.stats.failed}</p>
+                        <p>Converted files location: ${data.convertedPath}</p>
+                    `;
+                } else {
+                    status.className = 'status error';
+                    status.textContent = `Error: ${data.error}`;
+                }
             })
             .catch(error => {
-                document.getElementById('status').textContent = `Error: ${error.message}`;
+                status.className = 'status error';
+                status.textContent = `Error: ${error.message}`;
             });
         }
     </script>
