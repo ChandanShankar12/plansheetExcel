@@ -17,7 +17,6 @@ class ExcelProcessor {
             }
         };
     }
-
     // Initialize and validate directories
     async init() {
         try {
