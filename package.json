@@ -1,11 +1,17 @@
 {
   "name": "excel-processor",
   "version": "1.0.0",
-  "main": "server.js",
+  "type": "commonjs",
+  "main": "main.js",
   "dependencies": {
     "exceljs": "^4.3.0",
     "express": "^4.17.1",
     "path": "^0.12.7",
     "xlsx": "^0.18.5"
+  },
+  
+  "scripts": {
+    "start": "node main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   }
 }
