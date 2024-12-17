@@ -1,7 +1,7 @@
 const path = require('path');
 const { Sheets, Column } = require('./sheets.js');
 const ExcelJS = require('exceljs');
-const {cleanJsonData} = require('./app.js');
+const {mapBoothDetailsToExcel} = require('./app.js');
 const fs = require('fs');
 
 
@@ -13,6 +13,7 @@ const columnData_filepath = path.join(__dirname, './__test__/Processed_Files_Dat
 const mainprocessedDataColumn_filepath = path.join(__dirname,  './__test__/Processed_Files_Data/processedColumnData.json');
 const pairedRowDataOutput_filepath = path.join(__dirname, './__test__/Processed_Files_Data/row_data_output.json');
 const processedRowDataOutput_filepath = path.join(__dirname, './__test__/Processed_Files_Data/row_data_output.json');
+const boothDetails_filepath = path.join(__dirname, './__test__/Processed_Files_Data/booth_details.json');
 
 // getColumnData(plansheet_filepath,'A:N');
 // processColumnData(['C','D','E','F','G','H','I'], columnData_filepath, processedDataColumn_filepath);
@@ -31,6 +32,8 @@ const processedRowDataOutput_filepath = path.join(__dirname, './__test__/Process
 //     .catch(err => console.error(err));
 
 // createPairedRowData(plansheet_filepath, pairedRowDataOutput_filepath);
+// cleanJsonData(processedRowDataOutput_filepath);
 
+// individualboothdetails(processedRowDataOutput_filepath)
 
-cleanJsonData(processedRowDataOutput_filepath);
+mapBoothDetailsToExcel(boothDetails_filepath, './__test__/Processed_Files_Data/Converted_Files')

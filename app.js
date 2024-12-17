@@ -417,5 +417,136 @@ module.exports = {
         } catch (error) {
             console.error('Error processing JSON file:', error);
         }
+    },
+
+    individualboothdetails: function(filepath) {
+        try {
+            const jsonData = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+            const boothDetails = {};
+            
+            jsonData.forEach(row => {
+                if (!Array.isArray(row) || row.length < 2) return;
+                
+                const [firstSubRow, secondSubRow] = row;
+                
+                if (!Array.isArray(firstSubRow) || !firstSubRow[2] || 
+                    !Array.isArray(secondSubRow) || !secondSubRow[2]) return;
+
+                const boothNo = firstSubRow[2]; // Assuming booth number is at index 2
+                
+                // Skip if boothNo is not an integer
+                if (!Number.isInteger(boothNo)) return;
+
+                // Create structured object
+                boothDetails[boothNo] = {
+                    "SNo.": firstSubRow[0],
+                    "CHC": firstSubRow[1],
+                    "Booth No.": boothNo,
+                    "Booth Location": firstSubRow[3] || null,
+                    "Population": firstSubRow[4] || null,
+                    "Targeted Population": firstSubRow[5] || null,
+                    "No. of Houses": firstSubRow[6] || null,
+                    "Almendazol Req.": firstSubRow[7] || null,
+                    "Dec Req.": firstSubRow[8] || null,
+                    "Post Name": {
+                        "AWW": {
+                            "name": firstSubRow[9] || null,
+                            "Phone No.": firstSubRow[11] ? String(firstSubRow[11]) : "null"
+                        },
+                        "xzkeh.k": {
+                            "name": secondSubRow[9] || null,
+                            "Phone No.": secondSubRow[11] ? String(secondSubRow[11]) : "null"
+                        }
+                    },
+                    "Date of Medicine Feeling": firstSubRow[12] || null,
+                    "Supervisor name": firstSubRow[13] || null
+                };
+            });
+            
+            const outputDir = path.join(__dirname, './__test__/Processed_Files_Data');
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+            
+            const outputPath = path.join(outputDir, 'booth_details.json');
+            fs.writeFileSync(outputPath, JSON.stringify(boothDetails, null, 2));
+            
+            console.log(`Booth details saved to: ${outputPath}`);
+            return boothDetails;
+
+        } catch (error) {
+            console.error('Error processing JSON file:', error);
+            throw error;
+        }
+    },
+
+    mapBoothDetailsToExcel: async function(inputFilePath, outputDirPath) {
+        try {
+            // Read booth details JSON
+            const boothDetailsRaw = fs.readFileSync(inputFilePath, 'utf8');
+            const boothDetails = JSON.parse(boothDetailsRaw);
+
+            // Load Excel template
+            const workbook = new ExcelJS.Workbook();
+            
+            // Process each booth
+            for (const [boothNo, details] of Object.entries(boothDetails)) {
+                // Create a new workbook for each booth
+                const templatePath = path.join(__dirname, './__test__/ProcessFiles/303 MDA Mircorplan.xlsx');
+                await workbook.xlsx.readFile(templatePath);
+                const worksheet = workbook.getWorksheet(1);
+
+                // Update B4 cell - Booth Number
+                const cellB4 = worksheet.getCell('B4');
+                const currentB4Value = cellB4.value;
+                // Keep text before % and append booth number
+                cellB4.value = currentB4Value.toString().split('%')[0] + '%' + details['Booth No.'];
+
+                // Update D4 cell - First Worker Details (AWW)
+                const cellD4 = worksheet.getCell('D4');
+                const awwDetails = details['Post Name']['AWW'];
+                // Format: izFke nydehZ dk uke %[name] inuke%AWW Qksu ua0%[phone]
+                cellD4.value = `izFke nydehZ dk uke %${awwDetails.name} inuke%AWW Qksu ua0%${awwDetails['Phone No.']}`;
+
+                // Update D5 cell - Second Worker Details (xzkeh.k)
+                const cellD5 = worksheet.getCell('D5');
+                const xzkehDetails = details['Post Name']['xzkeh.k'];
+                // Format: f}rh; nydehZ dk uke %[name] inuke%xzkeh.k Qksu ua0%[phone]
+                cellD5.value = `f}rh; nydehZ dk uke %${xzkehDetails.name} inuke%xzkeh.k Qksu ua0%${xzkehDetails['Phone No.']}`;
+
+                // Distribute houses across cells
+                const totalHouses = details['No. of Houses'];
+                const numCells = 14; // Total cells to distribute across
+                const housesPerCell = Math.floor(totalHouses / numCells);
+                const remainder = totalHouses % numCells;
+
+                // Define all house cells
+                const houseCells = [
+                    'B10', 'D10', 'F10', 'H10', 'J10', 'L10', 'N10',
+                    'B17', 'D17', 'F17', 'H17', 'J17', 'L17', 'N17'
+                ];
+
+                // Distribute houses evenly with remainder
+                houseCells.forEach((cell, index) => {
+                    const value = housesPerCell + (index < remainder ? 1 : 0);
+                    worksheet.getCell(cell).value = value;
+                });
+
+                // Create output directory if needed
+                if (!fs.existsSync(outputDirPath)) {
+                    fs.mkdirSync(outputDirPath, { recursive: true });
+                }
+
+                // Save as new file with booth number
+                const outputPath = path.join(outputDirPath, `${boothNo} MDA 2025.xlsx`);
+                await workbook.xlsx.writeFile(outputPath);
+            }
+
+            console.log('Successfully generated Excel files for all booths');
+
+        } catch (error) {
+            console.error('Error mapping booth details to Excel:', error);
+            throw error;
+        }
     }
 }
