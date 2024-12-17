@@ -329,11 +329,93 @@ module.exports = {
                 }
             });
         });
+
+    },
+    createPairedRowData: async function(filePath, outputPath) {
+        try {
+            // Create workbook and load the file
+            const workbook = new ExcelJS.Workbook();
+            // Make this async operation properly awaited
+            return workbook.xlsx.readFile(filePath).then(() => {
+                // Get the first worksheet if 'MainSheet' doesn't exist
+                const worksheet = workbook.getWorksheet('MainSheet') || workbook.worksheets[0];
+                
+                // Add error checking
+                if (!worksheet) {
+                    throw new Error('No worksheet found in the workbook');
+                }
+
+                const rowData = {};
+                let rowCount = 0;
+
+                // Iterate through rows
+                worksheet.eachRow((row, rowNumber) => {
+                    // Get cell values, skipping first empty element
+                    const rowValues = row.values.slice(1).map(cell => {
+                        if (cell && typeof cell === 'object') {
+                            // Handle richText objects
+                            if (cell.richText) {
+                                return cell.richText.map(rt => rt.text).join('');
+                            }
+                            // Handle other cell result values
+                            if (cell.result !== undefined) {
+                                return cell.result;
+                            }
+                        }
+                        return cell;
+                    });
+
+                    rowData[rowCount] = rowValues;
+                    rowCount++;
+                });
+
+                const outputDir = path.join(__dirname, './__test__/Processed_Files_Data');
+                if (!fs.existsSync(outputDir)) {
+                    fs.mkdirSync(outputDir, { recursive: true });
+                }
+
+                // Write to JSON file
+                fs.writeFileSync(outputPath, JSON.stringify(rowData, null, 2));
+                
+                console.log(`Row data saved to: ${outputPath}`);
+                return rowData;
+            });
+
+        } catch (error) {
+            console.error('Error creating row data:', error);
+            throw error;
+        }
+    },
+
+    cleanJsonData: function(filepath) {
+        try {
+            // Read the file
+            const jsonData = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+            
+            // Clean the data
+            const cleanedData = jsonData.map(row => {
+                return row.map(subRow => {
+                    return subRow.map(cell => {
+                        // If cell is an object with richText, get the combined text
+                        if (cell && typeof cell === 'object' && cell.richText) {
+                            return cell.richText.map(part => part.text).join('');
+                        }
+                        // If cell is an object with result, return only the result
+                        if (cell && typeof cell === 'object' && 'result' in cell) {
+                            return cell.result;
+                        }
+                        // Otherwise return the cell value as is
+                        return cell;
+                    });
+                });
+            });
+    
+            // Write back to the same file
+            fs.writeFileSync(filepath, JSON.stringify(cleanedData, null, 2));
+            console.log('Successfully cleaned and saved JSON data');
+            
+        } catch (error) {
+            console.error('Error processing JSON file:', error);
+        }
     }
-};
-
-
-        
-
-
-
+}
