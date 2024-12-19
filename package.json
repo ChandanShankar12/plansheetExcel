@@ -9,9 +9,11 @@
     "path": "^0.12.7",
     "xlsx": "^0.18.5"
   },
-  
   "scripts": {
     "start": "node main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
   }
 }
