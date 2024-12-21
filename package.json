@@ -2,7 +2,7 @@
   "name": "excel-processor",
   "version": "1.0.0",
   "type": "module",
-  "main": "main.js",
+  "main": "./backend/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
