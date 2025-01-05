@@ -1,5 +1,13 @@
 # Remove these conflict markers and combine the content
 node_modules
 node_modules/
-Production Files/
+.next/
+
+
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 # ... rest of the gitignore content ... 
