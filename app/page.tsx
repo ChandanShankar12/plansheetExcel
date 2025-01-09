@@ -1,22 +1,14 @@
-import Sidebar from '../components/sidebar'
-import Header from '../components/header'
-import NewFileSection from '../components/newFileSection'
-import RecentFilesSection from '../components/recentFilesSection'
 
+import HeroSection from '../components/HeroSection'
+import MainContent from '../components/MainContent'
 
 const Page = ({ children }: { children?: React.ReactNode }) => {
   return (
-    <div className="flex min-h-screen bg-[#EBEBEB]">
-      <Sidebar />
-      <div className="flex-1">
-        <Header />
-        <NewFileSection />
-        <RecentFilesSection />
-        
-        {children}
-      </div>
-    </div>
+    <>
+      <HeroSection height={132} />
+      <MainContent />
+    </>
   )
 }
 
-export default Page
+export default Page;

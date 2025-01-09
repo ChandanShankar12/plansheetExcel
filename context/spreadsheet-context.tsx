@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback } from 'react';
-import { CellData, CellStyle, SpreadsheetHistory } from '@/lib/spreadsheet/types';
+import { CellData, CellStyle, SpreadsheetHistory } from '../lib/spreadsheet/types';
 
 interface SpreadsheetContextType {
   activeCell: string | null;
