@@ -1,14 +1,13 @@
-
-import HeroSection from '../components/HeroSection'
-import MainContent from '../components/MainContent'
+import SplashScreen from "components/SplashScreen";
 
 const Page = ({ children }: { children?: React.ReactNode }) => {
   return (
     <>
-      <HeroSection height={132} />
-      <MainContent />
+    <div className="flex flex-col">
+        <SplashScreen />
+      </div>
     </>
-  )
-}
+  );
+};
 
 export default Page;
