@@ -7,13 +7,13 @@ import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 interface ToolbarProps {
   activeCell: string | null;
   data: Record<string, string>;
-  setData: (data: Record<string, string>) => void;
+  setData: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }
 
 export function Toolbar({ activeCell, data, setData }: ToolbarProps) {
   const handleFormulaChange = (value: string) => {
     if (activeCell) {
-      setData((prev) => ({ ...prev, [activeCell]: value }));
+      setData(prev => ({ ...prev, [activeCell]: value }));
     }
   };
 

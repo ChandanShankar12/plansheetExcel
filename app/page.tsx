@@ -1,13 +1,11 @@
-import SplashScreen from "components/SplashScreen";
+import SplashScreen from "@/components/SplashScreen";
 
-const Page = ({ children }: { children?: React.ReactNode }) => {
+export default function Page() {
   return (
     <>
-    <div className="flex flex-col">
+      <div className="flex flex-col">
         <SplashScreen />
       </div>
     </>
   );
-};
-
-export default Page;
+}

@@ -1,0 +1,10 @@
+{
+  "patterns": [
+    "dist/**/*",
+    "electron/**/*"
+  ],
+  "logLevel": "debug",
+  "env": {
+    "NODE_ENV": "development"
+  }
+} 

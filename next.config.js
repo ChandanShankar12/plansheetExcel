@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
-export const nextConfig = {
-    // reactStrictMode: true,
+const config = {
+  output: 'export',
+  images: {
+    unoptimized: true
+  },
+  assetPrefix: process.env.NODE_ENV === 'development' ? undefined : '/',
+  basePath: ''
 }
 
-// module.exports = nextConfig
-
-  
+export default config

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { greetingAccordingToTime } from "utils/utils";
+import { greetingAccordingToTime } from "@/utils/utils";
 
 interface HeroSectionProps {
   height: number;

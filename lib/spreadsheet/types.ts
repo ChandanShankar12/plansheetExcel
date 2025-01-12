@@ -2,17 +2,29 @@ export interface CellStyle {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
-  fontFamily?: string;
-  fontSize?: string;
   align?: 'left' | 'center' | 'right';
-  format?: 'text' | 'number' | 'currency' | 'percentage';
+  fontFamily?: string;
+  fontSize?: number;
+  textColor?: string;
+  backgroundColor?: string;
 }
 
 export interface CellData {
   value: string;
-  style: CellStyle;
+  formula?: string;
+  style?: CellStyle;
 }
 
+export interface SpreadsheetData {
+  [key: string]: CellData;
+}
+
+export interface SpreadsheetContextType {
+  activeCell: string | null;
+  data: SpreadsheetData;
+  updateCell: (cell: string, data: Partial<CellData>) => void;
+  setActiveCell: (cell: string | null) => void;
+}
 export interface SpreadsheetHistory {
   past: Record<string, CellData>[];
   future: Record<string, CellData>[];
