@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from 'electron'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
+'use client';
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -8,14 +10,15 @@ const __dirname = path.dirname(__filename)
 let mainWindow: BrowserWindow | null = null
 
 const createWindow = () => {
+  // const { width, height } = getScreenResolution()
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     frame: true,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: true,
-      preload: path.join(__dirname, './preload.js')
+      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   })
 

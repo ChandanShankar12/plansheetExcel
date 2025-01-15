@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable}`}>
-      <body className="min-h-screen bg-primaryColor">
+      <body className="min-h-screen ">
         <main className="flex flex-col">
           {children}
         </main>

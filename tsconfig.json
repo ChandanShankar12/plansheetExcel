@@ -21,7 +21,7 @@
     "incremental": true,
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     },
     "plugins": [
@@ -36,7 +36,8 @@
     "**/*.tsx",
     "electron/**/*.ts",
     ".next/types/**/*.ts",
-    "electron/dist/types/**/*.ts"
+    "electron/dist/types/**/*.ts",
+    "out/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
