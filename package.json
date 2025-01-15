@@ -4,15 +4,15 @@
   "type": "module",
   "author": "Jane Doe",
   "license": "MIT",
-  "main": "dist/main.js",
+  "main": "electron/dist/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "electron": "tsc -p electron/tsconfig.json && electron .",
-    "electron-dev": "tsc -p electron/tsconfig.json && electronmon .",
+    "electron-dev": "tsc -p electron/tsconfig.json && cross-env NODE_ENV=development electronmon .",
     "electron-build": "next build && tsc -p electron/tsconfig.json && electron-builder",
-    "dev:all": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development npm run electron-dev\""
+    "dev:all": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

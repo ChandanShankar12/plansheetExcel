@@ -1,7 +1,7 @@
 'use client';
 
 import Image from "next/image";
-import { greetingAccordingToTime } from "@/utils/utils";
+import { greetingAccordingToTime } from "../utils/utils";
 
 interface SplashScreenProps {
   isOpen?: boolean;
@@ -38,7 +38,7 @@ export default function SplashScreen({ isOpen = true, height = 584, width = 624 
           <div className="relative z-10 flex items-center gap-8">
             <div className="shrink-0">
               <Image 
-                src="/images/Group 91.svg" 
+                src="../puclic/images/Group 91.svg" 
                 alt="logo" 
                 height={92}
                 width={92}

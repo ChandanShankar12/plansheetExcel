@@ -7,16 +7,15 @@ const __dirname = path.dirname(__filename)
 
 let mainWindow: BrowserWindow | null = null
 
-const createMainWindow = () => {
+const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 624,
-    height: 584,
-    transparent: true,
-    center: true,
+    width: 1200,
+    height: 800,
+    frame: true,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
-      preload: path.join(__dirname, 'preload.js')
+      contextIsolation: true,
+      preload: path.join(__dirname, './preload.js')
     }
   })
 
@@ -28,7 +27,7 @@ const createMainWindow = () => {
   }
 }
 
-app.whenReady().then(createMainWindow)
+app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -38,6 +37,6 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow()
+    createWindow()
   }
-})
+}) 
