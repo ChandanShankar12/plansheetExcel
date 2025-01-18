@@ -1,17 +1,17 @@
 'use client';
 
-import { Grid } from './grid';
 import { Toolbar } from './toolbar';
+import { Grid } from './grid';
+import { ProjectBar } from './projectbar';
 
 export function Spreadsheet() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b">
-        <Toolbar />
-      </header>
-      <main className="flex-1 overflow-auto">
+    <div className="flex flex-col h-full">
+      <ProjectBar />
+      <Toolbar activeCell={null} data={null} setData={null} setFont={null} />
+      <div className="flex-1 relative">
         <Grid />
-      </main>
+      </div>
     </div>
   );
-} 
+}

@@ -2,9 +2,7 @@
 
 import { SpreadsheetProvider } from '../context/spreadsheet-context';
 import { Spreadsheet } from '../components/spreadsheet';
-
 import SplashScreen from '../components/SplashScreen';
-
 
 export default function Page() {
   return (

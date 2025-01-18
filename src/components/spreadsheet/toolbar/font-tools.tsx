@@ -36,7 +36,7 @@ export function FontTools() {
   return (
     <>
       <ToolbarSection border={false}>
-        <Type className="h-4 w-4" />
+        
         <select
           className="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm"
           onChange={(e) => updateFont(e.target.value)}
@@ -57,35 +57,7 @@ export function FontTools() {
           <option>16</option>
         </select>
       </ToolbarSection>
-      <ToolbarSection>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-none"
-          onClick={() => toggleStyle('bold')}
-          data-active={data[activeCell!]?.style?.bold}
-        >
-          <Bold className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-none"
-          onClick={() => toggleStyle('italic')}
-          data-active={data[activeCell!]?.style?.italic}
-        >
-          <Italic className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-none"
-          onClick={() => toggleStyle('underline')}
-          data-active={data[activeCell!]?.style?.underline}
-        >
-          <Underline className="h-4 w-4" />
-        </Button>
-      </ToolbarSection>
+      
     </>
   );
 }

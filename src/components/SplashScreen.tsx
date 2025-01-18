@@ -16,7 +16,7 @@ export default function SplashScreen({ isOpen = true, height = 584, width = 624 
 
       <div className="flex flex-col justify-between items-center p-16">
       <div className="flex flex-row justify-center"> 
-        <div> <Image src="/images/logo.png" alt="logo" width={100} height={100} /></div>
+        <div> <Image src="/images/Group 91.svg" alt="logo" width={100} height={100} /></div>
         <div className="flex flex-col">
           <span className="text-[24px] text-white font-semibold tracking-[0.72px]">Good Morning</span>
           <span className="text-[10px] text-white font-semibold tracking-[0.72px]">Personal Edition</span>

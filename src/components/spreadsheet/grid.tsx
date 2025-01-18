@@ -41,7 +41,7 @@ export function Grid() {
       {/* Grid with row numbers and cells */}
       <div className="flex">
         {/* Row numbers column */}
-        <div className="sticky left-0 bg-gray-50 w-[50px]">
+        <div className="sticky left-0 bg-gray-90 w-[50px]">
           {rows.map((row) => (
             <div key={row} className="border-r border-b h-[25px] flex items-center justify-center text-sm">
               {row}
