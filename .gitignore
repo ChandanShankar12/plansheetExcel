@@ -1,4 +1,4 @@
-# Remove these conflict markers and combine the content
+run dev:# Remove these conflict markers and combine the content
 node_modules
 node_modules/
 .next/
