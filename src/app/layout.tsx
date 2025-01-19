@@ -1,11 +1,12 @@
 import './globals.css';
+import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
-import { AppBar } from '../components/appbar/AppBar';
-import localFont from 'next/font/local';
+import { TitleBar } from '@/components/TitleBar/TitleBar';
 
-const inter = localFont({
-  src: '../../public/fonts/Inter-Regular.ttf',
+const inter = Inter({
+  subsets: ['latin'],
   display: 'swap',
+  variable: '--font-inter',
 });
 
 export const metadata: Metadata = {
@@ -19,10 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`min-h-screen ${inter.className}`}>
+    <html lang="en" className={`${inter.variable}`}>
+      <body className="min-h-screen ">
         <main className="flex flex-col">
-          <AppBar />
+          <TitleBar />
           {children}
         </main>
       </body>

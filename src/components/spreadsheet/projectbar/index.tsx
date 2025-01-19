@@ -1,30 +1,49 @@
+'use client';
+
 import Image from 'next/image';
-import { ToggleSwitch } from '@/components/ui/toggle-switch';
 import { Button } from '@/components/ui/button';
-import { PlusIcon, TrashIcon } from 'lucide-react';
+import { Settings2, Search, LayoutGrid } from 'lucide-react';
 
 export function ProjectBar() {
   return (
-    <div className="flex flex-row justify-between items-center">
-      <div className="flex flex-row gap-2">
-        <div className="w-10 h-10 bg-gray-200 rounded-full">
-          <Image src="/images/blanksheet.jpg" alt="Logo" width={40} height={40} />
-        </div>
-        <div className="flex flex-row"> 
-          <p className="text-sm font-medium">Blank Sheet</p>
-          <p className="text-xs text-gray-500">(Unsaved)</p>
-        </div>
+    <div className="flex flex-row justify-between items-center h-10 px-2 border-b border-gray-200 bg-white">
+      {/* Left Section - Title */}
+      <div className="flex items-center gap-2">
+        <Image 
+          src="/Icons/excel.svg" 
+          alt="Excel Icon" 
+          width={20} 
+          height={20}
+        />
+        <span className="text-sm text-gray-600">Untitled Project</span>
+        <span className="text-xs text-gray-400">(unsaved)</span>
       </div>
-      <ToggleSwitch options={[{ label: 'Feminino', value: 'f' }, { label: 'Masculino', value: 'm' }]} />
-      <div className="flex flex-row gap-2">
-        <Button>
-          <PlusIcon className="w-4 h-4" />
+
+      {/* Center Section - Navigation */}
+      <div className="flex gap-1">
+        <Button variant="default" className="bg-primaryColor hover:bg-primaryColor/90 h-7 text-xs rounded-none px-4">
+          Home
         </Button>
-      <Button>
-          <TrashIcon className="w-4 h-4" />
+        <Button variant="ghost" className="h-7 text-xs text-gray-600 rounded-none px-4">
+          Data
+        </Button>
+        <Button variant="ghost" className="h-7 text-xs text-gray-600 rounded-none px-4">
+          Analysis
+        </Button>
+      </div>
+
+      {/* Right Section - Actions */}
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Settings2 className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Search className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7">
+          <LayoutGrid className="h-4 w-4" />
         </Button>
       </div>
     </div>
   );
 }
-

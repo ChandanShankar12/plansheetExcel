@@ -6,9 +6,13 @@ import { ProjectBar } from './projectbar';
 
 export function Spreadsheet() {
   return (
-    <div className="flex flex-col h-full">
-      <ProjectBar />
-      <Toolbar activeCell={null} data={null} setData={null} setFont={null} />
+    <div className="relative flex flex-col justify-between h-full w-full">
+      <div className="flex flex-row justify-between w-full">
+        <ProjectBar />
+      </div>
+      <div className='w-full'>
+        <Toolbar />
+      </div>
       <div className="flex-1 relative">
         <Grid />
       </div>
