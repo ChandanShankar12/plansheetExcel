@@ -1,41 +1,67 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { Switch } from "@mui/material";
+import { styled } from "@mui/material/styles";
+import type { SwitchProps as MuiSwitchProps } from "@mui/material";
 
-interface ToggleSwitchProps {
-  options: Array<{
-    label: string;
-    value: string;
-  }>;
-  onChange?: (value: string) => void;
-  defaultValue?: string;
-}
+const IOSSwitch = styled((props: MuiSwitchProps) => (
+  <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
+))(({ theme }) => ({
+  width: 24,
+  height: 16,
+  padding: 0,
+  '& .MuiSwitch-switchBase': {
+    padding: 0,
+    margin: 2,
+    transitionDuration: '300ms',
+    '&.Mui-checked': {
+      transform: 'translateX(8px)',
+      color: '#fff',
+      '& + .MuiSwitch-track': {
+        backgroundColor: '#65C466',
+        opacity: 1,
+        border: 0,
+        ...theme.applyStyles('dark', {
+          backgroundColor: '#2ECA45',
+        }),
+      },
+      '&.Mui-disabled + .MuiSwitch-track': {
+        opacity: 0.5,
+      },
+    },
+    '&.Mui-focusVisible .MuiSwitch-thumb': {
+      color: '#33cf4d',
+      border: '6px solid #fff',
+    },
+    '&.Mui-disabled .MuiSwitch-thumb': {
+      color: theme.palette.grey[100],
+      ...theme.applyStyles('dark', {
+        color: theme.palette.grey[600],
+      }),
+    },
+    '&.Mui-disabled + .MuiSwitch-track': {
+      opacity: 0.7,
+      ...theme.applyStyles('dark', {
+        opacity: 0.3,
+      }),
+    },
+  },
+  '& .MuiSwitch-thumb': {
+    boxSizing: 'border-box',
+    width: 12,
+    height: 12,
+  },
+  '& .MuiSwitch-track': {
+    borderRadius: 16 / 2,
+    backgroundColor: '#E9E9EA',
+    opacity: 1,
+    transition: theme.transitions.create(['background-color'], {
+      duration: 500,
+    }),
+    ...theme.applyStyles('dark', {
+      backgroundColor: '#39393D',
+    }),
+  },
+}));
 
-export function ToggleSwitch({ options, onChange, defaultValue }: ToggleSwitchProps) {
-  const [selected, setSelected] = useState(defaultValue || options[0].value);
-
-  const handleToggle = (value: string) => {
-    setSelected(value);
-    onChange?.(value);
-  };
-
-  return (
-    <div className="flex h-8 bg-white rounded-md border border-gray-200 p-1">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          onClick={() => handleToggle(option.value)}
-          className={`
-            px-4 py-1 text-sm font-medium rounded transition-colors
-            ${selected === option.value 
-              ? 'bg-primaryColor text-white' 
-              : 'text-gray-600 hover:bg-gray-100'
-            }
-          `}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-} 
+export { IOSSwitch as ToggleSwitch };

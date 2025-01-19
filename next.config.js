@@ -4,12 +4,7 @@ const config = {
   distDir: 'out',
   images: {
     unoptimized: true
-  },
-  experimental: {
-    fontLoaders: [
-      { loader: '@next/font/google', options: { timeout: 30000 } },
-    ],
-  },
+  }
 }
 
 

@@ -15,7 +15,10 @@
     "dev:all": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron-dev\""
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.11.0",
     "@hookform/resolvers": "^3.9.0",
+    "@mui/material": "^6.4.0",
     "@next/swc-wasm-nodejs": "13.5.1",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",

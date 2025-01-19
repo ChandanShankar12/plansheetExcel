@@ -34,7 +34,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
   };
 
   return (
-    <div className="flex flex-row w-full items-center gap-2 p-4 bg-white border-b border-gray-200">
+    <div className="flex flex-row h-[32px] w-full items-center gap-2 mx-4 bg-white border-b border-gray-200">
       {/* 1st group - Undo/Redo */}
       <div className="flex items-center gap-2 shrink-0">
         <Button variant="ghost" size="icon" className="h-8 w-8">

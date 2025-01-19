@@ -1,26 +1,21 @@
+'use client';
 
-import * as React from "react"
-
-interface DividerProps extends React.HTMLAttributes<HTMLDivElement> {
-  orientation?: "horizontal" | "vertical"
-  className?: string
+interface DividerProps {
+  orientation?: 'vertical' | 'horizontal';
+  className?: string;
 }
 
-const Divider = React.forwardRef<HTMLDivElement, DividerProps>(
-  ({ orientation = "horizontal", className, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        role="separator"
-        className={`shrink-0 bg-border ${
-          orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]"
-        } ${className}`}
-        {...props}
-      />
-    )
-  }
-)
-
-Divider.displayName = "Divider"
-
-export { Divider }
+export function Divider({ orientation = 'vertical', className = '' }: DividerProps) {
+  return (
+    <div
+      className={`
+        ${orientation === 'vertical' 
+          ? 'h-4 w-[1px] mx-2' 
+          : 'w-full h-[1px] my-2'
+        }
+        bg-gray-500
+        ${className}
+      `}
+    />
+  );
+}
