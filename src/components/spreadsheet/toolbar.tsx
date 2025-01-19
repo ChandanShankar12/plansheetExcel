@@ -1,73 +1,111 @@
 'use client';
 
+import Image from 'next/image';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { 
-  Undo2, 
-  Redo2, 
-  Bold, 
-  Italic, 
-  Underline, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  Table2 
-} from 'lucide-react';
+import { CellData } from '@/lib/spreadsheet/types';
 
-export function Toolbar() {
+interface ToolbarProps {
+  activeCell: string | null;
+  data: Record<string, CellData>;
+  setData: (
+    data:
+      | Record<string, CellData>
+      | ((prev: Record<string, CellData>) => Record<string, CellData>)
+  ) => void;
+  setFont: {};
+}
+
+export const Divider = () => (
+  <div className="h-6 w-[1px] bg-gray-200 shrink-0" />
+);
+
+export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
+  const handleFormulaChange = (value: string) => {
+    if (activeCell) {
+      setData((prev) => ({
+        ...prev,
+        [activeCell]: {
+          value,
+          style: prev[activeCell]?.style || {},
+        },
+      }));
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2 p-1 border-b border-gray-200 bg-white">
-      {/* Undo/Redo */}
-      <div className="flex items-center gap-1 border-r pr-2">
+    <div className="flex flex-row w-full items-center gap-2 p-4 bg-white border-b border-gray-200">
+      {/* 1st group - Undo/Redo */}
+      <div className="flex items-center gap-2 shrink-0">
         <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Undo2 className="h-4 w-4" />
+          <Image src="/Icons/Toolbar/1.svg" alt="Undo" width={18} height={18} />
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Redo2 className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Font Controls */}
-      <div className="flex items-center gap-1">
-        <select defaultValue="Arial" className="h-8 px-2 border rounded">
-          <option>Arial</option>
-        </select>
-        <select defaultValue="12" className="h-8 w-16 px-2 border rounded">
-          <option>12</option>
-        </select>
-      </div>
-
-      {/* Text Formatting */}
-      <div className="flex items-center gap-1 border-l border-r px-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Bold className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Italic className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Underline className="h-4 w-4" />
+          <Image src="/Icons/Toolbar/2.svg" alt="Redo" width={18} height={18} />
         </Button>
       </div>
 
-      {/* Alignment */}
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <AlignLeft className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <AlignCenter className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <AlignRight className="h-4 w-4" />
-        </Button>
+      <Divider />
+
+      {/* 2nd group - Font Tools */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Input className="h-8 w-32" placeholder="Font" />
+        {/* Font buttons */}
+        {[3, 4, 5, 6, 7, 8].map((n) => (
+          <Button key={n} variant="ghost" size="icon" className="h-8 w-8">
+            <Image src={`/Icons/Toolbar/${n}.svg`} alt={`Tool ${n}`} width={16} height={16} />
+          </Button>
+        ))}
       </div>
 
-      {/* Table Tools */}
-      <div className="flex items-center gap-1 border-l pl-2">
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Table2 className="h-4 w-4" />
-        </Button>
+      <Divider />
+
+      {/* 3rd group - Alignment */}
+      <div className="flex items-center gap-2 shrink-0">
+        {[9, 10, 11].map((n) => (
+          <Button key={n} variant="ghost" size="icon" className="h-8 w-8">
+            <Image src={`/Icons/Toolbar/${n}.svg`} alt={`Tool ${n}`} width={16} height={16} />
+          </Button>
+        ))}
+      </div>
+
+      <Divider />
+
+      {/* 4th group - Insert */}
+      <div className="flex items-center gap-2 shrink-0">
+        {[12, 13, 14, 15].map((n) => (
+          <Button key={n} variant="ghost" size="icon" className="h-8 w-8">
+            <Image src={`/Icons/Toolbar/${n}.svg`} alt={`Tool ${n}`} width={16} height={16} />
+          </Button>
+        ))}
+      </div>
+
+      <Divider />
+
+      {/* 5th group - Formula */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="relative">
+          <Input className="h-8 w-32 pl-8" placeholder="Formula" />
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            <Image src="/Icons/Toolbar/16.svg" alt="Formula" width={16} height={16} />
+          </div>
+        </div>
+        {[17, 18, 19].map((n) => (
+          <Button key={n} variant="ghost" size="icon" className="h-8 w-8">
+            <Image src={`/Icons/Toolbar/${n}.svg`} alt={`Tool ${n}`} width={16} height={16} />
+          </Button>
+        ))}
+      </div>
+
+      <Divider />
+
+      {/* 6th group - View */}
+      <div className="flex items-center gap-2 shrink-0">
+        {[20, 21].map((n) => (
+          <Button key={n} variant="ghost" size="icon" className="h-8 w-8">
+            <Image src={`/Icons/Toolbar/${n}.svg`} alt={`Tool ${n}`} width={16} height={16} />
+          </Button>
+        ))}
       </div>
     </div>
   );
