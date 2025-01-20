@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide browser window scrollbar */
+html, body {
+  overflow: hidden;
+}
+
+/* Custom scrollbar for grid */
+.overflow-auto::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 0;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
 :root {
   --radius: 0.5rem;
 }
