@@ -38,7 +38,7 @@ export function FontTools() {
       <ToolbarSection border={false}>
         
         <select
-          className="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm"
+          className="h-8 w-42 rounded-md border border-input bg-background px-2 text-sm"
           onChange={(e) => updateFont(e.target.value)}
           value={data[activeCell!]?.style?.fontFamily || 'Arial'}
         >

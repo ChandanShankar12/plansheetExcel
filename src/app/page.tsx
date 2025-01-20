@@ -10,17 +10,18 @@ import { AppStatusBar } from '@/components/spreadsheet/appstatus-bar';
 export default function Page() {
   return (
     <SpreadsheetProvider>
-      <div className="flex flex-col h-[calc(100vh-32px)] bg-white">
+      <div className="flex flex-col h-full bg-white">
         {/* Header */}
-        <div className="flex flex-col shrink-0 pt-4 gap-4 px-4">
+        <div className="flex flex-col shrink-0 pt-4 gap-4 mx-4">
           <ProjectBar />
-          <div className="mx-4 mb-1">
+          <div className="flex flex-col w-full gap-3">
             <Toolbar />
+            <div className="bg-black h-[1px] w-screen" />
           </div>
         </div>
 
         {/* Spreadsheet Grid */}
-        <div className="flex-1 relative min-h-0">
+        <div className="flex-1 w-full relative min-h-0">
           <Spreadsheet />
         </div>
 

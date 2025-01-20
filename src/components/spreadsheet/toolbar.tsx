@@ -25,7 +25,9 @@ interface ToolbarProps {
 }
 
 export const Divider = () => (
-  <div className="h-6 w-[1px] bg-gray-200 shrink-0" />
+  <div className="flex flex-row w-full">
+    <div className="h-6 w-[1px] bg-gray-300 " />
+  </div>
 );
 
 export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
@@ -58,9 +60,9 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
   };
 
   const toolbarContent = (inDropdown = false) => (
-    <div ref={!inDropdown ? contentRef : undefined} className="flex h-[48px] items-center w-full px-2 gap-4">
+    <div ref={!inDropdown ? contentRef : undefined} className="flex h-[48px] flex-row justify-between items-center rounded-l-[6px] border-gray-300 border w-full px-2 gap-4">
       {/* 1st group - Undo/Redo */}
-      <div className="flex items-center gap-1 shrink-0 ">
+      <div className="flex items-start gap-1 justify-center">
         <Button variant="ghost" size="icon" className="h-8 w-8 p-1.5">
           <Image src="/Icons/Toolbar/1.svg" alt="Undo" width={16} height={16} />
         </Button>
@@ -72,7 +74,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
       <Divider />
 
       {/* 2nd group - Font Tools */}
-      <div className="flex items-center gap-1 shrink-0 ">
+      <div className="flex items-center gap-1 w-full justify-center">
         <FontTools />
         {/* Font buttons */}
         <Button variant="ghost" size="icon" className="h-8 w-8 p-1.5">
@@ -114,7 +116,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
       <Divider />
 
       {/* 3rd group - Alignment */}
-      <div className="flex items-center gap-1 shrink-0 ">
+      <div className="flex items-center gap-1 w-full justify-center ">
         {[9, 10, 11].map((n) => (
           <Button key={n} variant="ghost" size="icon" className="h-8 w-8 p-1.5">
             <Image
@@ -130,7 +132,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
       <Divider />
 
       {/* 4th group - Insert */}
-      <div className="flex items-center gap-1 shrink-0 ">
+      <div className="flex items-center gap-1 w-full justify-center">
         {[12, 13, 14, 15].map((n) => (
           <Button key={n} variant="ghost" size="icon" className="h-8 w-8 p-1.5">
             <Image
@@ -146,9 +148,9 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
       <Divider />
 
       {/* 5th group - Formula */}
-      <div className="flex items-center gap-1 shrink-0 ">
-        <div className="relative">
-          <Input className="h-8 w-24 sm:w-32 pl-8 pr-2" placeholder="Formula" />
+      <div className="flex items-center justify-center gap-1 w-full ">
+        <div className="relative items-center">
+          <Input className="h-8 w-42 sm:w-42 pl-8 pr-2" placeholder="Formula" />
           <div className="absolute left-2 top-1/2 -translate-y-1/2">
             <Image
               src="/Icons/Toolbar/16.svg"
@@ -173,7 +175,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
       <Divider />
 
       {/* 6th group - View */}
-      <div className="flex items-center gap-1 shrink-0 ">
+      <div className="flex items-center justify-center gap-1 w-full ">
         {[20, 21].map((n) => (
           <Button key={n} variant="ghost" size="icon" className="h-8 w-8 p-1.5">
             <Image
@@ -191,7 +193,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
   return (
     <div 
       ref={toolbarRef}
-      className="flex flex-row h-10 w-full items-center bg-white border-t border-b border-gray-200"
+      className="flex flex-row h-full w-full justify-center items-center bg-white"
     >
       {toolbarContent()}
 
