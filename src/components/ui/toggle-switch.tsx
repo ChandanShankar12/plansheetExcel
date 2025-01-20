@@ -1,67 +1,29 @@
-"use client";
+'use client';
 
-import { Switch } from "@mui/material";
-import { styled } from "@mui/material/styles";
-import type { SwitchProps as MuiSwitchProps } from "@mui/material";
+import * as React from 'react';
+import { cn } from '@/lib/utils';
 
-const IOSSwitch = styled((props: MuiSwitchProps) => (
-  <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
-))(({ theme }) => ({
-  width: 24,
-  height: 16,
-  padding: 0,
-  '& .MuiSwitch-switchBase': {
-    padding: 0,
-    margin: 2,
-    transitionDuration: '300ms',
-    '&.Mui-checked': {
-      transform: 'translateX(8px)',
-      color: '#fff',
-      '& + .MuiSwitch-track': {
-        backgroundColor: '#65C466',
-        opacity: 1,
-        border: 0,
-        ...theme.applyStyles('dark', {
-          backgroundColor: '#2ECA45',
-        }),
-      },
-      '&.Mui-disabled + .MuiSwitch-track': {
-        opacity: 0.5,
-      },
-    },
-    '&.Mui-focusVisible .MuiSwitch-thumb': {
-      color: '#33cf4d',
-      border: '6px solid #fff',
-    },
-    '&.Mui-disabled .MuiSwitch-thumb': {
-      color: theme.palette.grey[100],
-      ...theme.applyStyles('dark', {
-        color: theme.palette.grey[600],
-      }),
-    },
-    '&.Mui-disabled + .MuiSwitch-track': {
-      opacity: 0.7,
-      ...theme.applyStyles('dark', {
-        opacity: 0.3,
-      }),
-    },
-  },
-  '& .MuiSwitch-thumb': {
-    boxSizing: 'border-box',
-    width: 12,
-    height: 12,
-  },
-  '& .MuiSwitch-track': {
-    borderRadius: 16 / 2,
-    backgroundColor: '#E9E9EA',
-    opacity: 1,
-    transition: theme.transitions.create(['background-color'], {
-      duration: 500,
-    }),
-    ...theme.applyStyles('dark', {
-      backgroundColor: '#39393D',
-    }),
-  },
-}));
+interface ToggleSwitchProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  className?: string;
+}
 
-export { IOSSwitch as ToggleSwitch };
+export function ToggleSwitch({ className, ...props }: ToggleSwitchProps) {
+  return (
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input
+        type="checkbox"
+        className="sr-only peer"
+        {...props}
+      />
+      <div className={cn(
+        "w-[24px] h-[16px] bg-gray-00 rounded-full peer",
+        "peer-checked:after:translate-x-full peer-checked:after:border-white", 
+        "after:content-[''] after:absolute after:top-[2px] after:left-[2px]",
+        "after:bg-white after:border-gray-300 after:border after:rounded-full",
+        "after:h-[14px] after:w-[14px] after:transition-all",
+        "peer-checked:bg-green-500",
+        className
+      )}></div>
+    </label>
+  );
+}

@@ -20,8 +20,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable}`}>
-      <body className="min-h-screen ">
-        <main className="flex flex-col justify-between h-screen">
+      <body className="h-screen w-screen ">
+        <main className="flex flex-col justify-between h-screen w-screen">
           <TitleBar />
           {children}
         </main>

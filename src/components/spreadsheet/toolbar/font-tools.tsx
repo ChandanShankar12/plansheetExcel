@@ -29,7 +29,7 @@ export function FontTools() {
     if (!activeCell) return;
     const currentStyle = data[activeCell]?.style || {};
     updateCell(activeCell, {
-      style: { ...currentStyle, fontSize: value }
+      style: { ...currentStyle, fontSize: parseInt(value) }
     });
   };
 

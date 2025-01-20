@@ -3,11 +3,12 @@ import Image from 'next/image';
 import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
+
 import { Divider } from '../ui/divider';
 
 export const TitleBar = () => {
   return (
-    <div className="flex flex-row w-screen items-center bg-[#E3E3E3] h-[35px] px-2 py-4">
+    <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2 py-4">
       {/* Left section */}
       <div className="flex flex-row items-center gap-1">
         <Image
@@ -16,10 +17,11 @@ export const TitleBar = () => {
           width={24}
           height={24}
         />
-        <span className="text-[12px] flex flex-row items-center gap-2">
+         <Divider />
+        <span className="text-[12px]  flex flex-row items-center gap-2">
           <ToggleSwitch /> AutoSave
         </span>
-        <Divider />
+       
       </div>
 
       {/* Center section */}
@@ -43,29 +45,29 @@ export const TitleBar = () => {
         <Divider />
 
         {/* Window controls */}
-        <div className="flex">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+        <div className="flex flex-row items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
             <Image
               src="/Icons/mingcute_minimize-fill.svg"
               alt="Minimize"
-              width={14}
-              height={14}
+              width={12}
+              height={12}
             />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
             <Image
               src="/Icons/mingcute_restore-line.svg"
               alt="Restore"
-              width={14}
-              height={14}
+              width={12}
+              height={12}
             />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
             <Image
               src="/Icons/radix-icons_cross-2.svg"
               alt="Close"
-              width={14}
-              height={14}
+              width={12}
+              height={12}
             />
           </Button>
         </div>

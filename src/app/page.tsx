@@ -2,53 +2,38 @@
 
 import { SpreadsheetProvider } from '@/context/spreadsheet-context';
 import { Spreadsheet } from '@/components/spreadsheet';
-import SplashScreen from '@/components/SplashScreen';
-import { Slider } from '@/components/ui/slider';
 import { ProjectBar } from '@/components/spreadsheet/projectbar';
 import { Toolbar } from '@/components/spreadsheet/toolbar';
+import { SheetsBar } from '@/components/spreadsheet/sheets-bar';
+import { AppStatusBar } from '@/components/spreadsheet/appstatus-bar';
 
-export default function Sheets() {
+export default function Page() {
   return (
-    <div className="flex flex-col justify-between w-screen h-screen">
-      
-        <div className="flex flex-row w-full ">
+    <SpreadsheetProvider>
+      <div className="flex flex-col h-screen bg-white">
+        {/* Header */}
+        <div className="flex flex-col border-b border-gray-200">
           <ProjectBar />
+          <Toolbar />
         </div>
 
-        <div className="flex flex-row w-full h-full">
-          <Toolbar
-            activeCell={null}
-            data={{}}
-            setData={() => {}}
-            setFont={() => {}}
-          />
-        </div>
-     
-
-      <div className="flex flex-row w-full h-full">
-        <SpreadsheetProvider>
+        {/* Spreadsheet Grid */}
+        <div className="flex-1 overflow-auto">
           <Spreadsheet />
-        </SpreadsheetProvider>
-      </div>
+        </div>
 
-      {/* Status Bar */}
-      <div className="relative flex flex-row justify-between bg-primaryColor h-[22px] items-center">
-        <div className="flex flex-row gap-4 px-4">
-          <span className="text-white text-[10px]">Rows: {`Rows here`}</span>
-          <span className="text-white text-[10px]">
-            Columns: {`Columns here`}
-          </span>
-        </div>
-        <div className="w-[200px] px-4">
-          <Slider
-            defaultValue={[50, 50]}
-            orientation="horizontal"
-            min={1}
-            max={100}
-            step={1}
-          />
+        {/* Footer */}
+        <div className="border-t border-gray-200">
+          {/* Sheet Tabs */}
+          <div className="h-7 bg-[#F8FCF9] flex items-center">
+            <SheetsBar />
+          </div>
+          {/* Status Bar */}
+          <div className="h-6 bg-[#166534] text-white flex items-center text-xs">
+            <AppStatusBar />
+          </div>
         </div>
       </div>
-    </div>
+    </SpreadsheetProvider>
   );
 }

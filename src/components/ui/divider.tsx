@@ -13,7 +13,7 @@ export function Divider({ orientation = 'vertical', className = '' }: DividerPro
           ? 'h-4 w-[1px] mx-2' 
           : 'w-full h-[1px] my-2'
         }
-        bg-gray-500
+        bg-gray-300
         ${className}
       `}
     />
