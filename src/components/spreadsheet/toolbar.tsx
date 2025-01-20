@@ -58,7 +58,7 @@ export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
   };
 
   const toolbarContent = (inDropdown = false) => (
-    <div ref={!inDropdown ? contentRef : undefined} className="flex items-center w-full px-2 gap-4">
+    <div ref={!inDropdown ? contentRef : undefined} className="flex h-[48px] items-center w-full px-2 gap-4">
       {/* 1st group - Undo/Redo */}
       <div className="flex items-center gap-1 shrink-0 ">
         <Button variant="ghost" size="icon" className="h-8 w-8 p-1.5">

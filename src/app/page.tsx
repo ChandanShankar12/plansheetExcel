@@ -12,7 +12,7 @@ export default function Page() {
     <SpreadsheetProvider>
       <div className="flex flex-col h-[calc(100vh-32px)] bg-white">
         {/* Header */}
-        <div className="flex flex-col shrink-0">
+        <div className="flex flex-col shrink-0 pt-4 gap-4 px-4">
           <ProjectBar />
           <div className="mx-4 mb-1">
             <Toolbar />
