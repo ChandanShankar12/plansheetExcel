@@ -3,12 +3,13 @@ import Image from 'next/image';
 import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
+import { ToggleSliding } from '../ui/toggle-sliding';
 
 import { Divider } from '../ui/divider';
 
 export const TitleBar = () => {
   return (
-    <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2 py-4">
+    <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2">
       {/* Left section */}
       <div className="flex flex-row items-center gap-1">
         <Image
@@ -17,15 +18,14 @@ export const TitleBar = () => {
           width={24}
           height={24}
         />
-         <Divider />
+        <Divider />
         <span className="text-[12px]  flex flex-row items-center gap-2">
           <ToggleSwitch /> AutoSave
         </span>
-       
       </div>
 
       {/* Center section */}
-      <div className="flex-1 flex justify-center">
+      <div className="flex-1 flex justify-center items-center">
         <AioutlineSearch />
       </div>
 

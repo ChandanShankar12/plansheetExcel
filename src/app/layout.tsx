@@ -1,7 +1,10 @@
+
+
 import './globals.css';
 import localFont from 'next/font/local';
 import type { Metadata } from 'next';
-import { TitleBar } from '@/components/TitleBar/TitleBar';
+import { TitleBar } from '../components/TitleBar/TitleBar';
+import { AsideWrapper } from '@/components/Aside';
 
 const inter = localFont({
   src: '../../public/fonts/Inter-Regular.ttf',
@@ -20,10 +23,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable}`}>
-      <body className="h-screen w-screen ">
-        <main className="flex flex-col justify-between h-screen w-screen">
+      <body className="h-screen w-screen">
+        <main className="flex flex-col h-screen w-screen">
           <TitleBar />
-          {children}
+          <AsideWrapper>{children}</AsideWrapper>
         </main>
       </body>
     </html>

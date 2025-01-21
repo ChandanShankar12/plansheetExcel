@@ -9,51 +9,50 @@ export function Grid() {
   const columns = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 100 }, (_, i) => i + 1);
 
-  const renderCell = (cellId: string) => {
-    const cellData = data[cellId];
-    const displayValue = cellData?.value ? evaluateFormula(cellData.value, data) : '';
-    
-    return (
-      <div
-        key={cellId}
-        className={`border border-gray-200 p-1 min-w-[100px] h-[25px] ${
-          activeCell === cellId ? 'bg-blue-50' : ''
-        }`}
-        onClick={() => setActiveCell(cellId)}
-      >
-        {displayValue}
-      </div>
-    );
-  };
-
   return (
-    <div className="relative">
-      {/* Header row with column letters */}
-      <div className="flex sticky top-0 bg-gray-50 z-10">
-        <div className="w-[50px] border-r border-b" /> {/* Corner cell */}
+    <div className="relative w-full">
+      {/* Header row */}
+      <div className="sticky top-0 z-10 flex bg-white">
+        <div className="sticky left-0 z-20 w-[35px] shrink-0 bg-white border-r border-b" />
         {columns.map((col) => (
-          <div key={col} className="min-w-[100px] border-r border-b p-1 text-center font-medium">
+          <div key={col} className="w-[80px] shrink-0 border-r border-b p-1 text-center text-xs">
             {col}
           </div>
         ))}
       </div>
 
-      {/* Grid with row numbers and cells */}
+      {/* Grid content */}
       <div className="flex">
-        {/* Row numbers column */}
-        <div className="sticky left-0 bg-gray-90 w-[50px]">
+        {/* Row numbers */}
+        <div className="sticky left-0 z-10 bg-white">
           {rows.map((row) => (
-            <div key={row} className="border-r border-b h-[25px] flex items-center justify-center text-sm">
+            <div key={row} className="w-[35px] h-[20px] shrink-0 border-r border-b flex items-center justify-center text-xs">
               {row}
             </div>
           ))}
         </div>
 
         {/* Cells */}
-        <div>
+        <div className="flex-1">
           {rows.map((row) => (
             <div key={row} className="flex">
-              {columns.map((col) => renderCell(`${col}${row}`))}
+              {columns.map((col) => {
+                const cellId = `${col}${row}`;
+                const cellData = data[cellId];
+                const displayValue = cellData?.value ? evaluateFormula(cellData.value, data) : '';
+                
+                return (
+                  <div
+                    key={cellId}
+                    className={`w-[80px] h-[20px] shrink-0 border-r border-b p-1 text-xs
+                      ${activeCell === cellId ? 'bg-blue-50' : ''}
+                    `}
+                    onClick={() => setActiveCell(cellId)}
+                  >
+                    {displayValue}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>

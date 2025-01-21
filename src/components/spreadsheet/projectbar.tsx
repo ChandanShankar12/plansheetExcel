@@ -25,7 +25,7 @@ export function ProjectBar() {
         </div>
       </div>
 
-     <ToggleSliding/>
+    
 
       {/* Right Section - Actions */}
       <div className="flex flex-row items-center gap-1">
