@@ -1,10 +1,8 @@
-
-
 import './globals.css';
 import localFont from 'next/font/local';
 import type { Metadata } from 'next';
 import { TitleBar } from '../components/TitleBar/TitleBar';
-import { AsideWrapper } from '@/components/Aside';
+import { Aside } from '@/components/Aside';
 
 const inter = localFont({
   src: '../../public/fonts/Inter-Regular.ttf',
@@ -26,7 +24,10 @@ export default function RootLayout({
       <body className="h-screen w-screen">
         <main className="flex flex-col h-screen w-screen">
           <TitleBar />
-          <AsideWrapper>{children}</AsideWrapper>
+          <div className="flex-1">
+            {children}
+            <Aside />
+          </div>
         </main>
       </body>
     </html>

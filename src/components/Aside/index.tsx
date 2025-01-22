@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { FloatingModal } from '../ai/floating_modal';
 import { useState, useEffect } from 'react';
+import { Input } from '../ui/input';
 
 interface AsideWrapperProps {
   children: React.ReactNode;
@@ -12,57 +13,125 @@ function AsideWrapper({ children }: AsideWrapperProps) {
   const [isAsideOpen, setIsAsideOpen] = useState(false);
 
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.key === 'F1') {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Check for both uppercase and lowercase 'F1'
+      if (event.shiftKey && (event.key === 'F1' || event.key === 'f1')) {
+        event.preventDefault();
+        console.log('Shortcut pressed'); // Debug log
         setIsAsideOpen(prev => !prev);
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    // Add the event listener to document instead of window
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
   }, []);
 
+  // Debug log for state changes
+  useEffect(() => {
+    console.log('Aside state:', isAsideOpen);
+  }, [isAsideOpen]);
+
   return (
-    <div className="flex flex-row flex-1">
-      {children}
-      <Aside isOpen={isAsideOpen} />
+    <div className="flex flex-row flex-1 relative">
+      <div className="flex-1">{children}</div>
+   
     </div>
   );
 }
 
-interface AsideProps {
-  isOpen: boolean;
-}
+export function Aside() {
+  const [isOpen, setIsOpen] = useState(false);
 
-function Aside({ isOpen }: AsideProps) {
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (event.shiftKey && (event.key === 'F1' || event.key === 'f1')) {
+        event.preventDefault();
+        setIsOpen(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   return (
     <aside 
       className={`
-        border-r border-gray-200
+        border-l border-gray-200
         transition-all duration-300 ease-in-out
-        ${isOpen ? 'w-[565px] h-full' : 'w-0 h-0 overflow-hidden'}
+        ${isOpen ? 'w-[400px]' : 'w-0'}
+        overflow-hidden
+        shrink-0
       `}
     >
-      <div className={`
-        flex flex-col h-full p-4 whitespace-nowrap m-2 bg-[#F7F7F7]
-        transition-all duration-300 ease-in-out
-        ${isOpen ? 'opacity-100' : 'opacity-0'}
-      `}>
-        <div className="flex flex-col h-full justify-between">
-          <div className="flex flex-row gap-1 items-center justify-end w-full">
-            <button className="flex items-center justify-center hover:bg-gray-200 rounded p-1">
-              <Image src="/Icons/teenyicons_spreadsheet-solid.png" alt="Excel Icon" width={24} height={24} />
+      <div 
+        className={`
+          h-full w-[400px]
+          transition-all duration-300 ease-in-out
+          transform
+          ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+          bg-white
+          flex flex-col
+        `}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span>Hi, How can I help you today?</span>
+          </div>
+          <div className="flex gap-2">
+            <button className="p-1 hover:bg-gray-100 rounded">
+              <Image src="/Icons/refresh.svg" alt="Refresh" width={16} height={16} />
             </button>
-            <button className="flex items-center justify-center hover:bg-gray-200 rounded p-1">
-              <Image src="/Icons/teenyicons_spreadsheet-solid.png" alt="Excel Icon" width={24} height={24} />
+            <button className="p-1 hover:bg-gray-100 rounded">
+              <Image src="/Icons/settings.svg" alt="Settings" width={16} height={16} />
             </button>
-            <button className="flex items-center justify-center hover:bg-gray-200 rounded p-1">
-              <Image src="/Icons/teenyicons_spreadsheet-solid.png" alt="Excel Icon" width={24} height={24} />
+            <button className="p-1 hover:bg-gray-100 rounded">
+              <Image src="/Icons/maximize.svg" alt="Maximize" width={16} height={16} />
             </button>
           </div>
-          <div className="flex-1">This is where the AI chat section will be</div>
-          <div className="w-full">
-            <FloatingModal isFloating={false} />
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 overflow-auto p-4">
+          {/* User Message */}
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="bg-gray-100 rounded-lg p-3 max-w-[80%] self-end">
+              What is the supervisor name of booth 456?
+            </div>
+            <span className="text-xs text-gray-500 self-end">2:15PM</span>
+          </div>
+
+          {/* Assistant Message */}
+          <div className="flex flex-col gap-2">
+            <div className="bg-green-50 rounded-lg p-3 max-w-[80%]">
+              The name of Booth Number 456 supervisor is "Seema Choudhary".
+            </div>
+            <span className="text-xs text-gray-500">2:15PM</span>
+          </div>
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 border-t">
+          <div className="relative">
+            <Input 
+              placeholder="I need the data from column E in the chart."
+              className="pr-24 py-2"
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
+              <button>
+                <Image src="/Icons/attach.svg" alt="Attach" width={20} height={20} />
+              </button>
+              <button>
+                <Image src="/Icons/send.svg" alt="Send" width={20} height={20} />
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-1">
+            <Image src="/Icons/sheets.svg" alt="Sheets" width={16} height={16} />
+            <span className="text-xs text-gray-500">All Sheets</span>
           </div>
         </div>
       </div>
@@ -70,4 +139,4 @@ function Aside({ isOpen }: AsideProps) {
   );
 }
 
-export { AsideWrapper, Aside };
+export { AsideWrapper };
