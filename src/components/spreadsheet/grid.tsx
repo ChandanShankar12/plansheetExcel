@@ -4,6 +4,8 @@ import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { evaluateFormula } from '@/lib/spreadsheet';
 import { useState, useRef, useEffect } from 'react';
 import { ContextMenu } from './context-menu';
+import { updateCellValue } from '@/lib/db/services/cell-service';
+import { storage } from '@/lib/db/services/json-storage';
 
 interface Selection {
   start: string;
@@ -26,14 +28,29 @@ export function Grid() {
     undo, 
     redo, 
     canUndo, 
-    canRedo 
+    canRedo,
+    spreadsheetId,
+    setData,
+    activeSheetId,
+    selection,
+    setSelection
   } = useSpreadsheetContext();
   const [editValue, setEditValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [selection, setSelection] = useState<Selection | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const [resizing, setResizing] = useState<{
+    type: 'row' | 'column';
+    index: number | string;
+    startPos: number;
+    startSize: number;
+  } | null>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const columns = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
   const rows = Array.from({ length: 100 }, (_, i) => i + 1);
@@ -60,37 +77,86 @@ export function Grid() {
     return col >= minCol && col <= maxCol && row >= minRow && row <= maxRow;
   };
 
-  // Handle mouse selection
-  const handleMouseDown = (cellId: string) => {
+  // Handle single cell click
+  const handleCellClick = (cellId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
     if (!isEditing) {
-      setIsSelecting(true);
-      setSelection({ start: cellId, end: cellId });
       setActiveCell(cellId);
+      if (!isDragging) {
+        setSelection({ start: cellId, end: cellId });
+      }
     }
   };
 
+  // Handle mouse down for drag selection
+  const handleMouseDown = (cellId: string) => {
+    if (!isEditing) {
+      setIsDragging(true);
+      setActiveCell(cellId);
+      setSelection({ start: cellId, end: cellId });
+    }
+  };
+
+  // Handle mouse enter for drag selection
   const handleMouseEnter = (cellId: string) => {
-    if (isSelecting && selection) {
+    if (isDragging && selection) {
       setSelection(prev => prev ? { ...prev, end: cellId } : null);
     }
   };
 
+  // Handle mouse up to end drag selection
   const handleMouseUp = () => {
-    setIsSelecting(false);
+    setIsDragging(false);
   };
 
-  // Handle cell editing
-  const startEditing = (cellId: string) => {
-    setIsEditing(true);
-    setEditValue(data[cellId]?.value || '');
+  // Add mouse up listener
+  useEffect(() => {
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => document.removeEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  // Handle double click to start editing
+  const handleCellDoubleClick = (cellId: string) => {
     setActiveCell(cellId);
+    setIsEditing(true);
+    const cellKey = `${activeSheetId}_${cellId}`;
+    setEditValue(data[cellKey]?.value || '');
   };
 
+  // Handle cell value updates
+  const handleCellUpdate = async (cellId: string, value: string) => {
+    try {
+      setSavingCells(prev => new Set(prev).add(cellId));
+      
+      // Update UI immediately
+      updateCell(`${activeSheetId}_${cellId}`, { value });
+      
+      // Update storage
+      storage.updateCell(spreadsheetId, activeSheetId, cellId, {
+        value,
+        formula: value.startsWith('=') ? value : undefined,
+        style: data[`${activeSheetId}_${cellId}`]?.style || {},
+        metadata: data[`${activeSheetId}_${cellId}`]?.metadata || {}
+      });
+    } catch (error) {
+      console.error('Failed to update cell:', error);
+    } finally {
+      setSavingCells(prev => {
+        const next = new Set(prev);
+        next.delete(cellId);
+        return next;
+      });
+    }
+  };
+
+  // Stop editing and save value
   const stopEditing = () => {
-    if (activeCell && editValue !== data[activeCell]?.value) {
-      updateCell(activeCell, { value: editValue });
+    if (activeCell && editValue !== data[`${activeSheetId}_${activeCell}`]?.value) {
+      handleCellUpdate(activeCell, editValue);
     }
     setIsEditing(false);
+    setEditValue('');
   };
 
   // Update keyboard shortcuts to handle selection
@@ -98,15 +164,24 @@ export function Grid() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeCell || isEditing) return;
 
+      // Save (Ctrl/Cmd + S)
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        const saveButton = document.querySelector('button[title="Save (Ctrl+S)"]');
+        if (saveButton instanceof HTMLButtonElement) {
+          saveButton.click();
+        }
+      }
+
       // Copy (Ctrl/Cmd + C)
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        const selectedCells = selection ? getSelectedCellsData() : data[activeCell]?.value || '';
+        const selectedCells = selection ? getSelectedCellsData() : data[`${activeSheetId}_${activeCell}`]?.value || '';
         navigator.clipboard.writeText(selectedCells);
       }
 
       // Cut (Ctrl/Cmd + X)
       if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-        const selectedCells = selection ? getSelectedCellsData() : data[activeCell]?.value || '';
+        const selectedCells = selection ? getSelectedCellsData() : data[`${activeSheetId}_${activeCell}`]?.value || '';
         navigator.clipboard.writeText(selectedCells);
         if (selection) {
           clearSelectedCells();
@@ -128,7 +203,7 @@ export function Grid() {
 
       // Start editing on F2 or when typing any character
       if (e.key === 'F2' || (!isEditing && e.key.length === 1 && !e.ctrlKey && !e.metaKey)) {
-        startEditing(activeCell);
+        handleCellDoubleClick(activeCell);
       }
 
       // Finish editing on Enter
@@ -179,7 +254,7 @@ export function Grid() {
     for (let row = minRow; row <= maxRow; row++) {
       for (let col = minCol; col <= maxCol; col++) {
         const cellId = `${String.fromCharCode(col)}${row}`;
-        result += (data[cellId]?.value || '') + '\t';
+        result += (data[`${activeSheetId}_${cellId}`]?.value || '') + '\t';
       }
       result = result.trim() + '\n';
     }
@@ -275,8 +350,8 @@ export function Grid() {
     // Only clear the content, keep the column
     rows.forEach(row => {
       const cellId = `${col}${row}`;
-      if (newData[cellId]) {
-        newData[cellId] = { ...newData[cellId], value: '' };
+      if (newData[`${activeSheetId}_${cellId}`]) {
+        newData[`${activeSheetId}_${cellId}`] = { ...newData[`${activeSheetId}_${cellId}`], value: '' };
       }
     });
     setData(newData);
@@ -289,8 +364,8 @@ export function Grid() {
     // Only clear the content, keep the row
     columns.forEach(col => {
       const cellId = `${col}${row}`;
-      if (newData[cellId]) {
-        newData[cellId] = { ...newData[cellId], value: '' };
+      if (newData[`${activeSheetId}_${cellId}`]) {
+        newData[`${activeSheetId}_${cellId}`] = { ...newData[`${activeSheetId}_${cellId}`], value: '' };
       }
     });
     setData(newData);
@@ -307,11 +382,11 @@ export function Grid() {
         const nextCol = String.fromCharCode(currentCol.charCodeAt(0) + 1);
         const currentCellId = `${currentCol}${row}`;
         const nextCellId = `${nextCol}${row}`;
-        newData[currentCellId] = newData[nextCellId] || { value: '' };
+        newData[`${activeSheetId}_${currentCellId}`] = newData[`${activeSheetId}_${nextCellId}`] || { value: '' };
         currentCol = nextCol;
       }
       // Delete the last column
-      delete newData[`Z${row}`];
+      delete newData[`${activeSheetId}_${col}${row}`];
     });
     setData(newData);
     setSelection(null);
@@ -327,42 +402,108 @@ export function Grid() {
         const nextRow = currentRow + 1;
         const currentCellId = `${col}${currentRow}`;
         const nextCellId = `${col}${nextRow}`;
-        newData[currentCellId] = newData[nextCellId] || { value: '' };
+        newData[`${activeSheetId}_${currentCellId}`] = newData[`${activeSheetId}_${nextCellId}`] || { value: '' };
         currentRow = nextRow;
       }
       // Delete the last row
-      delete newData[`${col}${rows.length}`];
+      delete newData[`${activeSheetId}_${col}${rows.length}`];
     });
     setData(newData);
     setSelection(null);
     setContextMenu(null);
   };
 
+  // Handle resize start
+  const handleResizeStart = (
+    e: React.MouseEvent,
+    type: 'row' | 'column',
+    index: number | string,
+    currentSize: number
+  ) => {
+    e.preventDefault();
+    setResizing({
+      type,
+      index,
+      startPos: type === 'column' ? e.clientX : e.clientY,
+      startSize: currentSize
+    });
+  };
+
+  // Handle resize move
+  useEffect(() => {
+    if (!resizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (resizing.type === 'column') {
+        const diff = e.clientX - resizing.startPos;
+        const newWidth = Math.max(40, resizing.startSize + diff);
+        setColumnWidths(prev => ({
+          ...prev,
+          [resizing.index]: newWidth
+        }));
+      } else {
+        const diff = e.clientY - resizing.startPos;
+        const newHeight = Math.max(20, resizing.startSize + diff);
+        setRowHeights(prev => ({
+          ...prev,
+          [resizing.index as number]: newHeight
+        }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setResizing(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizing]);
+
+  // Add a function to get computed styles for a cell
+  const getCellStyles = (cellStyle: CellStyle = {}) => ({
+    fontFamily: cellStyle.fontFamily || 'Arial, sans-serif',
+    fontSize: cellStyle.fontSize ? `${cellStyle.fontSize}px` : '12px',
+    fontWeight: cellStyle.bold ? 'bold' : 'normal',
+    fontStyle: cellStyle.italic ? 'italic' : 'normal',
+    textDecoration: cellStyle.underline ? 'underline' : 'none',
+    color: cellStyle.textColor || '#000',
+    backgroundColor: cellStyle.backgroundColor || 'transparent',
+    textAlign: cellStyle.align || 'left',
+    WebkitFontSmoothing: 'antialiased',
+    MozOsxFontSmoothing: 'grayscale'
+  });
+
   return (
-    <div 
-      className="relative w-full"
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Header row */}
+    <div className="relative w-full">
+      {/* Header row with corner cell */}
       <div className="sticky top-0 z-10 flex bg-white">
-        <div className="sticky left-0 z-20 w-[35px] shrink-0 bg-white border-r border-b" />
+        {/* Corner cell */}
+        <div className="sticky left-0 z-20 w-[40px] h-[24px] bg-[#f8f9fa] border-r border-b flex items-center justify-center">
+          <div className="w-full h-full bg-[#f8f9fa] border-r border-b" />
+        </div>
+        
+        {/* Column headers */}
         {columns.map((col) => (
-          <div 
-            key={col} 
-            className={`
-              w-[80px] shrink-0 border-r border-b p-1 text-center text-xs 
-              hover:bg-gray-50 cursor-pointer
-              ${selection?.start.startsWith(col) ? 'bg-[#e6f0eb]' : ''}
-            `}
-            onContextMenu={(e) => handleHeaderContextMenu(e, col)}
-            onClick={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                handleHeaderContextMenu(e, col);
-              }
-            }}
-          >
-            {col}
+          <div key={col} className="relative">
+            <div 
+              className={`
+                w-[80px] h-[24px] shrink-0 border-r border-b 
+                bg-[#f8f9fa] text-[#666] font-medium
+                flex items-center justify-center text-xs
+                hover:bg-gray-100 cursor-pointer
+                ${selection?.start.startsWith(col) ? 'bg-[#e6f0eb]' : ''}
+              `}
+              onContextMenu={(e) => handleHeaderContextMenu(e, col)}
+            >
+              {col}
+            </div>
+            {/* Column resize handle */}
+            <div className="resize-handle-col" />
           </div>
         ))}
       </div>
@@ -372,22 +513,21 @@ export function Grid() {
         {/* Row numbers */}
         <div className="sticky left-0 z-10 bg-white">
           {rows.map((row) => (
-            <div 
-              key={row} 
-              className={`
-                w-[35px] h-[20px] shrink-0 border-r border-b 
-                flex items-center justify-center text-xs 
-                hover:bg-gray-50 cursor-pointer
-                ${selection?.start.endsWith(row.toString()) ? 'bg-[#e6f0eb]' : ''}
-              `}
-              onContextMenu={(e) => handleRowContextMenu(e, row)}
-              onClick={(e) => {
-                if (e.ctrlKey || e.metaKey) {
-                  handleRowContextMenu(e, row);
-                }
-              }}
-            >
-              {row}
+            <div key={row} className="relative">
+              <div 
+                className={`
+                  w-[40px] h-[20px] shrink-0 border-r border-b 
+                  bg-[#f8f9fa] text-[#666] font-medium
+                  flex items-center justify-center text-xs
+                  hover:bg-gray-100 cursor-pointer
+                  ${selection?.start.endsWith(row.toString()) ? 'bg-[#e6f0eb]' : ''}
+                `}
+                onContextMenu={(e) => handleRowContextMenu(e, row)}
+              >
+                {row}
+              </div>
+              {/* Row resize handle */}
+              <div className="resize-handle-row" />
             </div>
           ))}
         </div>
@@ -395,14 +535,14 @@ export function Grid() {
         {/* Cells */}
         <div className="flex-1">
           {rows.map((row) => (
-            <div key={row} className="flex">
+            <div key={row} className="flex h-[20px]">
               {columns.map((col) => {
                 const cellId = `${col}${row}`;
-                const cellData = data[cellId];
-                const displayValue = cellData?.value ? evaluateFormula(cellData.value, data) : '';
+                const cellKey = `${activeSheetId}_${cellId}`;
+                const cellData = data[cellKey];
                 const isActive = activeCell === cellId;
-                const isInSelection = isCellSelected(cellId);
-                const { isTopEdge, isRightEdge, isBottomEdge, isLeftEdge } = getSelectionBounds(cellId);
+                const cellStyle = cellData?.style || {};
+                const computedStyles = getCellStyles(cellStyle);
                 
                 return (
                   <div
@@ -410,16 +550,12 @@ export function Grid() {
                     className={`
                       w-[80px] h-[20px] shrink-0 border-r border-b 
                       relative cursor-cell select-none
-                      ${isActive && !isInSelection ? 'ring-2 ring-[#166534] ring-inset' : ''}
-                      ${isInSelection ? 'bg-[#e6f0eb]' : ''}
-                      ${isInSelection && isTopEdge ? 'border-t-2 border-t-[#166534] -mt-[1px]' : ''}
-                      ${isInSelection && isRightEdge ? 'border-r-2 border-r-[#166534] -mr-[1px]' : ''}
-                      ${isInSelection && isBottomEdge ? 'border-b-2 border-b-[#166534] -mb-[1px]' : ''}
-                      ${isInSelection && isLeftEdge ? 'border-l-2 border-l-[#166534] -ml-[1px]' : ''}
+                      ${isActive ? 'ring-2 ring-[#166534] ring-inset' : ''}
+                      hover:bg-gray-50
                     `}
-                    onMouseDown={() => handleMouseDown(cellId)}
-                    onMouseEnter={() => handleMouseEnter(cellId)}
-                    onDoubleClick={() => startEditing(cellId)}
+                    style={computedStyles}
+                    onClick={(e) => handleCellClick(cellId, e)}
+                    onDoubleClick={() => handleCellDoubleClick(cellId)}
                   >
                     {isEditing && isActive ? (
                       <input
@@ -430,12 +566,25 @@ export function Grid() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             stopEditing();
+                          } else if (e.key === 'Escape') {
+                            setIsEditing(false);
+                            setEditValue(data[cellKey]?.value || '');
                           }
                         }}
-                        className="absolute inset-0 w-full h-full px-1 text-xs outline-none"
+                        className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
+                        style={{
+                          ...computedStyles,
+                          lineHeight: '20px', // Match cell height
+                        }}
+                        autoFocus
                       />
                     ) : (
-                      <div className="px-1 text-xs truncate">{displayValue}</div>
+                      <div 
+                        className="px-1 truncate h-full flex items-center"
+                        style={computedStyles}
+                      >
+                        {cellData?.value ? evaluateFormula(cellData.value, data) : ''}
+                      </div>
                     )}
                   </div>
                 );
@@ -471,6 +620,11 @@ export function Grid() {
           type={contextMenu.type}
           index={contextMenu.index}
         />
+      )}
+
+      {/* Resize overlay */}
+      {resizing && (
+        <div className="fixed inset-0 z-50 cursor-col-resize" />
       )}
     </div>
   );

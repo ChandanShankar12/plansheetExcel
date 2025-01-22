@@ -1,0 +1,58 @@
+{
+  "1_D": {
+    "id": 1737548927456,
+    "spreadsheetId": 1,
+    "key": "D",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_A": {
+    "id": 1737549192750,
+    "spreadsheetId": 1,
+    "key": "A",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_C": {
+    "id": 1737549470203,
+    "spreadsheetId": 1,
+    "key": "C",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_E": {
+    "id": 1737549892371,
+    "spreadsheetId": 1,
+    "key": "E",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_B": {
+    "id": 1737549917089,
+    "spreadsheetId": 1,
+    "key": "B",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_F": {
+    "id": 1737550154629,
+    "spreadsheetId": 1,
+    "key": "F",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  },
+  "1_G": {
+    "id": 1737550156023,
+    "spreadsheetId": 1,
+    "key": "G",
+    "width": 80,
+    "hidden": false,
+    "metadata": {}
+  }
+}

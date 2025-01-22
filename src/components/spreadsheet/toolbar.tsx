@@ -12,6 +12,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { FontSelector } from './font-selector';
 
 interface ToolbarProps {
   activeCell: string | null;
@@ -30,7 +32,31 @@ export const Divider = () => (
   </div>
 );
 
-export function Toolbar({ activeCell, data, setData, setFont }: ToolbarProps) {
+export function Toolbar() {
+  const { activeCell, data, updateCell, activeSheetId } = useSpreadsheetContext();
+  
+  const handleFontChange = (fontFamily: string) => {
+    if (activeCell) {
+      const cellKey = `${activeSheetId}_${activeCell}`;
+      const currentCell = data[cellKey];
+      updateCell(cellKey, {
+        ...currentCell,
+        style: {
+          ...currentCell?.style,
+          fontFamily
+        }
+      });
+    }
+  };
+
+  const getCurrentFont = () => {
+    if (activeCell) {
+      const cellKey = `${activeSheetId}_${activeCell}`;
+      return data[cellKey]?.style?.fontFamily || FONT_FAMILIES[0].value;
+    }
+    return FONT_FAMILIES[0].value;
+  };
+
   const [isOverflowing, setIsOverflowing] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);

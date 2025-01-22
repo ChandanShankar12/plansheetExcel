@@ -13,6 +13,7 @@ export interface CellData {
   value: string;
   formula?: string;
   style?: CellStyle;
+  metadata?: Record<string, any>;
 }
 
 export interface SpreadsheetData {

@@ -1,8 +1,10 @@
 import './globals.css';
+import '@/styles/fonts.css';
 import localFont from 'next/font/local';
 import type { Metadata } from 'next';
 import { TitleBar } from '../components/TitleBar/TitleBar';
-import { Aside } from '@/components/Aside';
+import { SpreadsheetProvider } from '@/context/spreadsheet-context';
+
 
 const inter = localFont({
   src: '../../public/fonts/Inter-Regular.ttf',
@@ -21,14 +23,52 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable}`}>
+      <head>
+        <link
+          rel="preload"
+          href="/fonts/Inter-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/Roboto-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/Montserrat-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/OpenSans-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/fonts/Lato-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="h-screen w-screen">
-        <main className="flex flex-col h-screen w-screen">
-          <TitleBar />
-          <div className="flex-1">
-            {children}
-            <Aside />
-          </div>
-        </main>
+        <SpreadsheetProvider>
+          <main className="flex flex-col h-screen w-screen">
+            <TitleBar />
+            <div className="flex-1">
+              {children}
+            </div>
+          </main>
+        </SpreadsheetProvider>
       </body>
     </html>
   );

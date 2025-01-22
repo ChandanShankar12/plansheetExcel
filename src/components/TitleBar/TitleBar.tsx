@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
 import { ToggleSliding } from '../ui/toggle-sliding';
+import { SaveButton } from '../SaveButton';
 
 import { Divider } from '../ui/divider';
 
@@ -12,12 +13,7 @@ export const TitleBar = () => {
     <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2">
       {/* Left section */}
       <div className="flex flex-row items-center gap-1">
-        <Image
-          src="/Icons/fluent_save-16-regular.svg"
-          alt="Logo"
-          width={24}
-          height={24}
-        />
+        <SaveButton />
         <Divider />
         <span className="text-[12px]  flex flex-row items-center gap-2">
           <ToggleSwitch /> AutoSave
@@ -71,6 +67,10 @@ export const TitleBar = () => {
             />
           </Button>
         </div>
+
+        <Divider />
+
+        <SaveButton />
       </div>
     </div>
   );

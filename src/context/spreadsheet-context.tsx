@@ -18,6 +18,11 @@ interface SpreadsheetContextType {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  spreadsheetId: number;
+  activeSheetId: number;
+  setActiveSheetId: (id: number) => void;
+  sheets: Sheet[];
+  addSheet: (name: string) => void;
 }
 
 const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
@@ -29,6 +34,11 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [data, setData] = useState<Record<string, CellData>>({});
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
+  const [spreadsheetId] = useState(1);
+  const [sheets, setSheets] = useState<Sheet[]>([
+    { id: 1, name: 'Sheet1' }
+  ]);
+  const [activeSheetId, setActiveSheetId] = useState(1);
 
   const pushToHistory = (newState: HistoryState) => {
     const newHistory = [...history.slice(0, currentIndex + 1), newState];
@@ -74,6 +84,15 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const addSheet = (name: string) => {
+    const newSheet = {
+      id: Date.now(),
+      name
+    };
+    setSheets([...sheets, newSheet]);
+    setActiveSheetId(newSheet.id);
+  };
+
   return (
     <SpreadsheetContext.Provider value={{ 
       activeCell, 
@@ -84,7 +103,12 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       undo,
       redo,
       canUndo: currentIndex > 0,
-      canRedo: currentIndex < history.length - 1
+      canRedo: currentIndex < history.length - 1,
+      spreadsheetId,
+      activeSheetId,
+      setActiveSheetId,
+      sheets,
+      addSheet,
     }}>
       {children}
     </SpreadsheetContext.Provider>

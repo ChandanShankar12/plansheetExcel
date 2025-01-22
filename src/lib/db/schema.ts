@@ -8,6 +8,16 @@ export const spreadsheets = pgTable('spreadsheets', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Sheets table
+export const sheets = pgTable('sheets', {
+  id: serial('id').primaryKey(),
+  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
+  name: text('name').notNull(),
+  index: integer('index').notNull(), // For sheet order
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Columns table
 export const columns = pgTable('columns', {
   id: serial('id').primaryKey(),
@@ -34,6 +44,7 @@ export const rows = pgTable('rows', {
 export const cells = pgTable('cells', {
   id: serial('id').primaryKey(),
   spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
+  sheetId: integer('sheet_id').references(() => sheets.id),
   columnId: integer('column_id').references(() => columns.id),
   rowId: integer('row_id').references(() => rows.id),
   value: text('value'),
