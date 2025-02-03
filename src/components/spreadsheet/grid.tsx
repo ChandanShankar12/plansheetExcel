@@ -4,6 +4,8 @@
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { evaluateFormula } from '@/lib/spreadsheet';
 import { useState, useRef, useEffect } from 'react';
+import { CellData } from '@/lib/spreadsheet/types';
+import { CellStyle } from '@/lib/spreadsheet/types';
 
 import { updateCellValue } from '@/lib/db/services/cell-service';
 import { storage } from '@/lib/db/services/json-storage';
@@ -610,17 +612,20 @@ export function Grid() {
           ))}
         </div>
 
-        {/* Cells */}
+        {/* Cells Grid Container */}
         <div className="flex-1">
-          {rows.map((row) => (
+          {/* Row Container - Maps through numeric rows (1-100) */}
+          {rows.map((row: number) => (
             <div key={row} className="flex h-[20px]">
-              {columns.map((col) => {
-                const cellId = `${col}${row}`;
-                const cellKey = `${activeSheetId}_${cellId}`;
-                const cellData = data[cellKey];
-                const isActive = activeCell === cellId;
-                const cellStyle = cellData?.style || {};
-                const computedStyles = getCellStyles(cellStyle);
+              {/* Column Container - Maps through letter columns (A-Z) */}
+              {columns.map((col: string) => {
+                // Cell identification and data retrieval
+                const cellId: string = `${col}${row}`; // e.g. "A1", "B2"
+                const cellKey: string = `${activeSheetId}_${cellId}`; // Unique key including sheet ID
+                const cellData: CellData | undefined = data[cellKey]; // Get cell data from spreadsheet context
+                const isActive: boolean = activeCell === cellId;
+                const cellStyle: CellStyle = cellData?.style || {}; // Get cell styling or empty object
+                const computedStyles: React.CSSProperties = getCellStyles(cellStyle);
 
                 return (
                   <div
@@ -632,35 +637,39 @@ export function Grid() {
                       hover:bg-gray-50
                     `}
                     style={computedStyles}
-                    onClick={(e) => handleCellClick(cellId, e)}
+                    onClick={(e: React.MouseEvent) => handleCellClick(cellId, e)}
                     onDoubleClick={() => handleCellDoubleClick(cellId)}
                   >
+                    {/* Cell Content - Switches between edit mode input and display mode */}
                     {isEditing && isActive ? (
+                      // Edit Mode - Input Field
                       <input
-                        ref={inputRef}
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={stopEditing}
-                        onKeyDown={(e) => {
+                        ref={inputRef} // Reference for focus management
+                        value={editValue} // Controlled input value
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditValue(e.target.value)}
+                        onBlur={stopEditing} // Handle focus loss
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                           if (e.key === 'Enter') {
-                            stopEditing();
+                            stopEditing(); // Save on Enter
                           } else if (e.key === 'Escape') {
-                            stopEditing();
+                            stopEditing(); // Cancel on Escape
                             setEditValue(data[cellKey]?.value || '');
                           }
                         }}
                         className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
                         style={{
                           ...computedStyles,
-                          lineHeight: '20px', // Match cell height
+                          lineHeight: '20px',
                         }}
                         autoFocus
                       />
                     ) : (
+                      // Display Mode - Cell Value
                       <div
                         className="px-1 truncate h-full flex items-center"
                         style={computedStyles}
                       >
+                        {/* Evaluate and display cell value or formula result */}
                         {cellData?.value
                           ? evaluateFormula(cellData.value, data)
                           : ''}

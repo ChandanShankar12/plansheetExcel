@@ -1,74 +1,28 @@
-import { pgTable, serial, text, jsonb, integer, varchar, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 
-// Base table for spreadsheet metadata
-export const spreadsheets = pgTable('spreadsheets', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+
+// Table Schema
+export const sheets = pgTable("sheets", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  sheetId: text("sheet_id").notNull(),
+  rowIndex: integer("row_index").notNull(),
+  columnIndex: integer("column_index").notNull(),
+  value: text("value"),
+  metadata: jsonb("metadata").$type<{
+    style?: Record<string, any>;
+    formula?: string;
+  }>().default({}),
+  mergedWith: text("merged_with"), // If part of a merged group, stores the ID of the primary (anchor) cell
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
 });
 
-// Sheets table
-export const sheets = pgTable('sheets', {
-  id: serial('id').primaryKey(),
-  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
-  name: text('name').notNull(),
-  index: integer('index').notNull(), // For sheet order
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
+// Types for type safety
+export type Sheet = typeof sheets.$inferSelect;
+export type NewSheet = typeof sheets.$inferInsert;
 
-// Columns table
-export const columns = pgTable('columns', {
-  id: serial('id').primaryKey(),
-  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
-  columnKey: varchar('column_key', { length: 3 }).notNull(), // A, B, C, etc.
-  title: text('title'), // Optional column title
-  width: integer('width').default(80), // Column width in pixels
-  hidden: boolean('hidden').default(false),
-  metadata: jsonb('metadata').default({}), // Any additional column metadata
-});
-
-// Rows table
-export const rows = pgTable('rows', {
-  id: serial('id').primaryKey(),
-  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
-  rowIndex: integer('row_index').notNull(), // 1, 2, 3, etc.
-  title: text('title'), // Optional row title
-  height: integer('height').default(20), // Row height in pixels
-  hidden: boolean('hidden').default(false),
-  metadata: jsonb('metadata').default({}), // Any additional row metadata
-});
-
-// Cells table
-export const cells = pgTable('cells', {
-  id: serial('id').primaryKey(),
-  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
-  sheetId: integer('sheet_id').references(() => sheets.id),
-  columnId: integer('column_id').references(() => columns.id),
-  rowId: integer('row_id').references(() => rows.id),
-  value: text('value'),
-  formula: text('formula'),
-  style: jsonb('style').default({}), // Cell styling
-  metadata: jsonb('metadata').default({}), // Any additional cell metadata
-});
-
-// Merged cells table
-export const mergedCells = pgTable('merged_cells', {
-  id: serial('id').primaryKey(),
-  spreadsheetId: integer('spreadsheet_id').references(() => spreadsheets.id),
-  startColumnId: integer('start_column_id').references(() => columns.id),
-  startRowId: integer('start_row_id').references(() => rows.id),
-  endColumnId: integer('end_column_id').references(() => columns.id),
-  endRowId: integer('end_row_id').references(() => rows.id),
-  value: text('value'),
-  formula: text('formula'),
-  style: jsonb('style').default({}),
-  metadata: jsonb('metadata').default({}),
-});
-
-// Types for the schema
-export type Style = {
+export type CellStyle = {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
@@ -78,27 +32,48 @@ export type Style = {
   fontFamily?: string;
   alignment?: 'left' | 'center' | 'right';
   verticalAlignment?: 'top' | 'middle' | 'bottom';
-  border?: {
+  borders?: {
     top?: string;
-    right?: string;
+    right?: string; 
     bottom?: string;
     left?: string;
   };
 };
 
 export type CellMetadata = {
+  style?: CellStyle;
+  formula?: string;
   comment?: string;
   validation?: {
     type: 'list' | 'number' | 'date' | 'text';
-    params: any;
+    params: unknown;
   };
   locked?: boolean;
+  mergeGroup?: string;
 };
 
-export type RowColumnMetadata = {
-  frozen?: boolean;
-  group?: {
-    id: string;
-    collapsed: boolean;
+// Add this interface
+export interface CellUpdate {
+  value: string;
+  metadata?: {
+    style?: Record<string, any>;
+    formula?: string;
   };
-}; 
+}
+
+// Update the Sheet type
+export interface Sheet {
+  id: number;
+  userId: string;
+  sheetId: string;
+  rowIndex: number;
+  columnIndex: number;
+  value: string;
+  metadata: {
+    style?: Record<string, any>;
+    formula?: string;
+  };
+  mergedWith: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
