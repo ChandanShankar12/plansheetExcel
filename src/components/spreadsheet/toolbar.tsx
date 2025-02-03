@@ -6,14 +6,14 @@ import { Button } from '../ui/button';
 import { CellData } from '@/lib/spreadsheet/types';
 import { ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import {FontTools} from '@/components/spreadsheet/toolbar/font-tools';
+// import {FontTools} from '@/components/spreadsheet/toolbar/font-tools';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { FontSelector } from './font-selector';
+// import { FontSelector } from './font-selector';
 
 interface ToolbarProps {
   activeCell: string | null;
@@ -49,13 +49,13 @@ export function Toolbar() {
     }
   };
 
-  const getCurrentFont = () => {
-    if (activeCell) {
-      const cellKey = `${activeSheetId}_${activeCell}`;
-      return data[cellKey]?.style?.fontFamily || FONT_FAMILIES[0].value;
-    }
-    return FONT_FAMILIES[0].value;
-  };
+  // const getCurrentFont = () => {
+  //   if (activeCell) {
+  //     const cellKey = `${activeSheetId}_${activeCell}`;
+  //     return data[cellKey]?.style?.fontFamily || FONT_FAMILIES[0].value;
+  //   }
+  //   return FONT_FAMILIES[0].value;
+  // };
 
   const [isOverflowing, setIsOverflowing] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -101,7 +101,7 @@ export function Toolbar() {
 
       {/* 2nd group - Font Tools */}
       <div className="flex items-center gap-1 w-full justify-center">
-        <FontTools />
+        {/* <FontTools /> */}
         {/* Font buttons */}
         <Button variant="ghost" size="icon" className="h-8 w-8 p-1.5">
           <Image

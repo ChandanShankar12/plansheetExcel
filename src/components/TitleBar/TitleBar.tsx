@@ -3,8 +3,7 @@ import Image from 'next/image';
 import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
-import { ToggleSliding } from '../ui/toggle-sliding';
-import { SaveButton } from '../SaveButton';
+import { SaveButton } from '../ui/SaveButton';
 
 import { Divider } from '../ui/divider';
 
@@ -67,10 +66,6 @@ export const TitleBar = () => {
             />
           </Button>
         </div>
-
-        <Divider />
-
-        <SaveButton />
       </div>
     </div>
   );
