@@ -4,6 +4,9 @@ node_modules/
 .next/
 .git/
 
+models/
+models/**
+
 
 .env
 .env.local

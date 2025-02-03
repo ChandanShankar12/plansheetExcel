@@ -19,6 +19,28 @@ interface ContextMenuState {
   index?: number | string;
 }
 
+interface CellStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  textColor?: string;
+  backgroundColor?: string;
+  align?: string;
+}
+
+interface CellData {
+  value: string;
+  formula?: string;
+  style?: CellStyle;
+  metadata?: Record<string, any>;
+}
+
+interface SpreadsheetData {
+  [key: string]: CellData;
+}
+
 export function Grid() {
   const { 
     activeCell, 
@@ -130,14 +152,15 @@ export function Grid() {
       setSavingCells(prev => new Set(prev).add(cellId));
       
       // Update UI immediately
-      updateCell(`${activeSheetId}_${cellId}`, { value });
+      const cellKey = `${activeSheetId}_${cellId}`;
+      updateCell(cellKey, { value });
       
       // Update storage
-      storage.updateCell(spreadsheetId, activeSheetId, cellId, {
+      await storage.updateCell(spreadsheetId, activeSheetId, cellId, {
         value,
         formula: value.startsWith('=') ? value : undefined,
-        style: data[`${activeSheetId}_${cellId}`]?.style || {},
-        metadata: data[`${activeSheetId}_${cellId}`]?.metadata || {}
+        style: data[cellKey]?.style || {},
+        metadata: data[cellKey]?.metadata || {}
       });
     } catch (error) {
       console.error('Failed to update cell:', error);
@@ -152,8 +175,11 @@ export function Grid() {
 
   // Stop editing and save value
   const stopEditing = () => {
-    if (activeCell && editValue !== data[`${activeSheetId}_${activeCell}`]?.value) {
-      handleCellUpdate(activeCell, editValue);
+    if (activeCell) {
+      const cellKey = `${activeSheetId}_${activeCell}`;
+      if (editValue !== data[cellKey]?.value) {
+        handleCellUpdate(activeCell, editValue);
+      }
     }
     setIsEditing(false);
     setEditValue('');
@@ -186,7 +212,8 @@ export function Grid() {
         if (selection) {
           clearSelectedCells();
         } else {
-          updateCell(activeCell, { value: '' });
+          const cellKey = `${activeSheetId}_${activeCell}`;
+          updateCell(cellKey, { value: '' });
         }
       }
 
@@ -196,7 +223,8 @@ export function Grid() {
           if (selection) {
             pasteToSelection(text);
           } else {
-            updateCell(activeCell, { value: text });
+            const cellKey = `${activeSheetId}_${activeCell}`;
+            updateCell(cellKey, { value: text });
           }
         });
       }
@@ -230,7 +258,7 @@ export function Grid() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activeCell, data, isEditing, selection, updateCell, undo, redo, canUndo, canRedo]);
+  }, [activeCell, data, isEditing, selection, updateCell, undo, redo, canUndo, canRedo, activeSheetId]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -254,7 +282,8 @@ export function Grid() {
     for (let row = minRow; row <= maxRow; row++) {
       for (let col = minCol; col <= maxCol; col++) {
         const cellId = `${String.fromCharCode(col)}${row}`;
-        result += (data[`${activeSheetId}_${cellId}`]?.value || '') + '\t';
+        const cellKey = `${activeSheetId}_${cellId}`;
+        result += (data[cellKey]?.value || '') + '\t';
       }
       result = result.trim() + '\n';
     }
@@ -274,7 +303,8 @@ export function Grid() {
     for (let row = minRow; row <= maxRow; row++) {
       for (let col = minCol; col <= maxCol; col++) {
         const cellId = `${String.fromCharCode(col)}${row}`;
-        updateCell(cellId, { value: '' });
+        const cellKey = `${activeSheetId}_${cellId}`;
+        updateCell(cellKey, { value: '' });
       }
     }
   };
@@ -291,7 +321,8 @@ export function Grid() {
         const newCol = String.fromCharCode(startCol.charCodeAt(0) + colIndex);
         const newRow = startRow + rowIndex;
         const cellId = `${newCol}${newRow}`;
-        updateCell(cellId, { value: cell });
+        const cellKey = `${activeSheetId}_${cellId}`;
+        updateCell(cellKey, { value: cell });
       });
     });
   };
@@ -350,8 +381,9 @@ export function Grid() {
     // Only clear the content, keep the column
     rows.forEach(row => {
       const cellId = `${col}${row}`;
-      if (newData[`${activeSheetId}_${cellId}`]) {
-        newData[`${activeSheetId}_${cellId}`] = { ...newData[`${activeSheetId}_${cellId}`], value: '' };
+      const cellKey = `${activeSheetId}_${cellId}`;
+      if (newData[cellKey]) {
+        newData[cellKey] = { ...newData[cellKey], value: '' };
       }
     });
     setData(newData);
@@ -364,8 +396,9 @@ export function Grid() {
     // Only clear the content, keep the row
     columns.forEach(col => {
       const cellId = `${col}${row}`;
-      if (newData[`${activeSheetId}_${cellId}`]) {
-        newData[`${activeSheetId}_${cellId}`] = { ...newData[`${activeSheetId}_${cellId}`], value: '' };
+      const cellKey = `${activeSheetId}_${cellId}`;
+      if (newData[cellKey]) {
+        newData[cellKey] = { ...newData[cellKey], value: '' };
       }
     });
     setData(newData);
@@ -382,11 +415,14 @@ export function Grid() {
         const nextCol = String.fromCharCode(currentCol.charCodeAt(0) + 1);
         const currentCellId = `${currentCol}${row}`;
         const nextCellId = `${nextCol}${row}`;
-        newData[`${activeSheetId}_${currentCellId}`] = newData[`${activeSheetId}_${nextCellId}`] || { value: '' };
+        const currentCellKey = `${activeSheetId}_${currentCellId}`;
+        const nextCellKey = `${activeSheetId}_${nextCellId}`;
+        newData[currentCellKey] = newData[nextCellKey] || { value: '' };
         currentCol = nextCol;
       }
       // Delete the last column
-      delete newData[`${activeSheetId}_${col}${row}`];
+      const lastCellKey = `${activeSheetId}_${col}${row}`;
+      delete newData[lastCellKey];
     });
     setData(newData);
     setSelection(null);
@@ -402,11 +438,14 @@ export function Grid() {
         const nextRow = currentRow + 1;
         const currentCellId = `${col}${currentRow}`;
         const nextCellId = `${col}${nextRow}`;
-        newData[`${activeSheetId}_${currentCellId}`] = newData[`${activeSheetId}_${nextCellId}`] || { value: '' };
+        const currentCellKey = `${activeSheetId}_${currentCellId}`;
+        const nextCellKey = `${activeSheetId}_${nextCellId}`;
+        newData[currentCellKey] = newData[nextCellKey] || { value: '' };
         currentRow = nextRow;
       }
       // Delete the last row
-      delete newData[`${activeSheetId}_${col}${rows.length}`];
+      const lastCellKey = `${activeSheetId}_${col}${rows.length}`;
+      delete newData[lastCellKey];
     });
     setData(newData);
     setSelection(null);
@@ -556,6 +595,8 @@ export function Grid() {
                     style={computedStyles}
                     onClick={(e) => handleCellClick(cellId, e)}
                     onDoubleClick={() => handleCellDoubleClick(cellId)}
+                    onMouseDown={() => handleMouseDown(cellId)}
+                    onMouseEnter={() => handleMouseEnter(cellId)}
                   >
                     {isEditing && isActive ? (
                       <input
@@ -628,4 +669,4 @@ export function Grid() {
       )}
     </div>
   );
-} 
+}

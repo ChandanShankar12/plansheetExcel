@@ -6,7 +6,7 @@ import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 
 export function Table() {
   const { activeCell } = useSpreadsheetContext();
-  const columns = 26;
+  const columns = 40;
   const rows = 100;
 
   const getCellId = (col: number, row: number) => {

@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { CellData } from '@/lib/spreadsheet/types';
+import { Sheet } from '@/lib/db/schema';
 
 interface HistoryState {
   data: Record<string, CellData>;
@@ -23,6 +24,9 @@ interface SpreadsheetContextType {
   setActiveSheetId: (id: number) => void;
   sheets: Sheet[];
   addSheet: (name: string) => void;
+  userId: string;
+  selection: Selection | null;
+  setSelection: (selection: Selection | null) => void;
 }
 
 const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
@@ -35,10 +39,10 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [spreadsheetId] = useState(1);
-  const [sheets, setSheets] = useState<Sheet[]>([
-    { id: 1, name: 'Sheet1' }
-  ]);
+  const [sheets, setSheets] = useState<Sheet[]>([]);
   const [activeSheetId, setActiveSheetId] = useState(1);
+  const [userId] = useState('1');
+  const [selection, setSelection] = useState<Selection | null>(null);
 
   const pushToHistory = (newState: HistoryState) => {
     const newHistory = [...history.slice(0, currentIndex + 1), newState];
@@ -93,6 +97,34 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     setActiveSheetId(newSheet.id);
   };
 
+  useEffect(() => {
+    const loadWorkbookData = async () => {
+      try {
+        const response = await fetch(`/api/cells?sheetId=${activeSheetId}&userId=${userId}`);
+        if (!response.ok) throw new Error('Failed to load workbook');
+        
+        const cells = await response.json();
+        const newData: Record<string, CellData> = {};
+        
+        cells.forEach((cell: Sheet) => {
+          const colLetter = String.fromCharCode(64 + cell.columnIndex);
+          const cellId = `${activeSheetId}_${colLetter}${cell.rowIndex}`;
+          newData[cellId] = {
+            value: cell.value || '',
+            style: cell.metadata?.style || {},
+            formula: cell.metadata?.formula
+          };
+        });
+        
+        setData(newData);
+      } catch (error) {
+        console.error('Error loading workbook:', error);
+      }
+    };
+
+    loadWorkbookData();
+  }, [activeSheetId, userId]);
+
   return (
     <SpreadsheetContext.Provider value={{ 
       activeCell, 
@@ -109,6 +141,9 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       setActiveSheetId,
       sheets,
       addSheet,
+      userId,
+      selection,
+      setSelection,
     }}>
       {children}
     </SpreadsheetContext.Provider>
