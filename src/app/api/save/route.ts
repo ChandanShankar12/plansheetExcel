@@ -1,35 +1,37 @@
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import { NextResponse } from 'next/server';
+import { saveWorkbookData } from '@/lib/db/services/cell-service';
+import type { NewSheet } from '@/lib/db/schema';
 
 export async function POST(request: Request) {
   try {
-    const data = await request.json();
-    const dataDir = join(process.cwd(), 'data');
+    const cells: NewSheet[] = await request.json();
+    
+    if (!cells || !Array.isArray(cells) || cells.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid data format' },
+        { status: 400 }
+      );
+    }
 
-    // Save each data type to its own file
-    await Promise.all([
-      writeFile(
-        join(dataDir, 'spreadsheets.json'), 
-        JSON.stringify(data.spreadsheets, null, 2)
-      ),
-      writeFile(
-        join(dataDir, 'columns.json'), 
-        JSON.stringify(data.columns, null, 2)
-      ),
-      writeFile(
-        join(dataDir, 'rows.json'), 
-        JSON.stringify(data.rows, null, 2)
-      ),
-      writeFile(
-        join(dataDir, 'cells.json'), 
-        JSON.stringify(data.cells, null, 2)
-      )
-    ]);
+    console.log('Received save request:', {
+      cellCount: cells.length,
+      sheetId: cells[0].sheetId,
+      userId: cells[0].userId
+    });
 
+    const result = await saveWorkbookData(cells);
+    
+    if (!result) {
+      throw new Error('Failed to save workbook');
+    }
+    
+    console.log('Successfully saved workbook');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save data:', error);
-    return NextResponse.json({ error: 'Failed to save data' }, { status: 500 });
+    console.error('Failed to save workbook:', error);
+    return NextResponse.json(
+      { error: 'Failed to save workbook' }, 
+      { status: 500 }
+    );
   }
 } 

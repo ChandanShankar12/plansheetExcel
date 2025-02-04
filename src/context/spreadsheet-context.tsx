@@ -37,7 +37,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, CellData>>({});
   const [history, setHistory] = useState<HistoryState[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [spreadsheetId] = useState(1);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [activeSheetId, setActiveSheetId] = useState(1);

@@ -2,7 +2,7 @@ import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg
 
 
 // Table Schema
-export const sheets = pgTable("sheets", {
+export const workbook = pgTable("workbook", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
   sheetId: text("sheet_id").notNull(),
@@ -19,8 +19,8 @@ export const sheets = pgTable("sheets", {
 });
 
 // Types for type safety
-export type Sheet = typeof sheets.$inferSelect;
-export type NewSheet = typeof sheets.$inferInsert;
+export type Workbook = typeof workbook.$inferSelect;
+export type NewWorkbook = typeof workbook.$inferInsert;
 
 export type CellStyle = {
   bold?: boolean;
