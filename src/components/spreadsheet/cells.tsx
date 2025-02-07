@@ -1,8 +1,11 @@
 'use client';
 
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { evaluateFormula } from '@/lib/spreadsheet';
-import { CellData, CellStyle } from '@/lib/spreadsheet/types';
+import { CellController } from '@/server/controllers/cell-controller';
+import { SheetController } from '@/server/controllers/sheet-controller';
+import { Cell } from '@/server/models/cell';
+import { Sheet } from '@/server/models/sheet';
+import { CellStyle } from '@/lib/types';
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface CellsProps {
@@ -20,39 +23,19 @@ export function Cells({
   isDragging,
   setIsDragging,
 }: CellsProps) {
-  const { activeCell, data, activeSheetId, setActiveCell, selection, setSelection, updateCell, userId } = useSpreadsheetContext();
+  const { 
+    activeCell, 
+    setActiveCell, 
+    activeSheet,
+    updateCell, 
+    selection,
+    setSelection,
+    userId 
+  } = useSpreadsheetContext();
 
-  // State for cell editing
   const [editValue, setEditValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Add function to call API
-  const saveCellToApi = useCallback(async (cellId: string, value: string) => {
-    try {
-      const response = await fetch('/api/cells', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          sheetId: activeSheetId,
-          cellId,
-          value,
-          formula: value.startsWith('=') ? value : undefined,
-        }),
-      });
-
-      console.log(response);
-
-      if (!response.ok) {
-        throw new Error('Failed to save cell');
-      }
-    } catch (error) {
-      console.error('Error saving cell:', error);
-    }
-  }, [activeSheetId, userId]);
 
   // Handle single cell click
   const handleCellClick = (cellId: string, e: React.MouseEvent) => {
@@ -66,19 +49,54 @@ export function Cells({
     }
   };
 
+  // Handle mouse enter during drag selection
+  const handleMouseEnter = (cellId: string) => {
+    if (isDragging && selection) {
+      setSelection({ ...selection, end: cellId });
+    }
+  };
+
   // Handle double click to start cell editing
   const handleCellDoubleClick = (cellId: string) => {
     setActiveCell(cellId);
     setIsEditing(true);
-    const cellKey = `${activeSheetId}_${cellId}`;
-    setEditValue(data[cellKey]?.value || '');
+    const cell = SheetController.getCell(activeSheet, cellId);
+    setEditValue(cell.getValue());
   };
 
-  // Update stopEditing to include API call
+  // Save cell value to backend
+  const saveCellToApi = useCallback(async (cellId: string, cell: Cell) => {
+    try {
+      const response = await fetch('/api/cells', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          sheetId: activeSheet.id,
+          cellId,
+          value: cell.getValue(),
+          formula: cell.getFormula(),
+          style: cell.style
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save cell');
+      }
+    } catch (error) {
+      console.error('Error saving cell:', error);
+    }
+  }, [activeSheet.id, userId]);
+
+  // Stop editing and save cell value
   const stopEditing = () => {
-    if (activeCell && editValue !== data[`${activeSheetId}_${activeCell}`]?.value) {
-      updateCell(`${activeSheetId}_${activeCell}`, { value: editValue });
-      saveCellToApi(activeCell, editValue);
+    if (activeCell) {
+      const cell = SheetController.getCell(activeSheet, activeCell);
+      CellController.updateCellValue(cell, editValue);
+      updateCell(activeCell, cell);
+      saveCellToApi(activeCell, cell);
     }
     setIsEditing(false);
     setEditValue('');
@@ -93,15 +111,13 @@ export function Cells({
 
   return (
     <div className="flex-1">
-      {rows.map((row: number) => (
+      {rows.map((row) => (
         <div key={row} className="flex h-[20px]">
-          {columns.map((col: string) => {
-            const cellId: string = `${col}${row}`;
-            const cellKey: string = `${activeSheetId}_${cellId}`;
-            const cellData: CellData | undefined = data[cellKey];
-            const isActive: boolean = activeCell === cellId;
-            const cellStyle: CellStyle = cellData?.style || {};
-            const computedStyles: React.CSSProperties = getCellStyles(cellStyle);
+          {columns.map((col) => {
+            const cellId = `${col}${row}`;
+            const cell = SheetController.getCell(activeSheet, cellId);
+            const isActive = activeCell === cellId;
+            const computedStyles = getCellStyles(cell.style);
 
             return (
               <div
@@ -113,24 +129,22 @@ export function Cells({
                   hover:bg-gray-50
                 `}
                 style={computedStyles}
-                onClick={(e: React.MouseEvent) => handleCellClick(cellId, e)}
+                onClick={(e) => handleCellClick(cellId, e)}
                 onDoubleClick={() => handleCellDoubleClick(cellId)}
-                
+                onMouseEnter={() => handleMouseEnter(cellId)}
               >
                 {isEditing && isActive ? (
                   <input
                     ref={inputRef}
                     value={editValue}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setEditValue(e.target.value)
-                    }
+                    onChange={(e) => setEditValue(e.target.value)}
                     onBlur={stopEditing}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         stopEditing();
                       } else if (e.key === 'Escape') {
-                        stopEditing();
-                        setEditValue(data[cellKey]?.value || '');
+                        setIsEditing(false);
+                        setEditValue(cell.getValue());
                       }
                     }}
                     className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
@@ -145,9 +159,7 @@ export function Cells({
                     className="px-1 truncate h-full flex items-center"
                     style={computedStyles}
                   >
-                    {cellData?.value
-                      ? evaluateFormula(cellData.value, data)
-                      : ''}
+                    {CellController.evaluateCell(cell, activeSheet)}
                   </div>
                 )}
               </div>

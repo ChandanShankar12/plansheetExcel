@@ -10,7 +10,7 @@ interface Sheet {
 }
 
 export function SheetsBar() {
-  const { activeSheetId, setActiveSheetId, sheets, addSheet } = useSpreadsheetContext();
+  const { activeSheet, sheets, addSheet } = useSpreadsheetContext();
   const [editingSheet, setEditingSheet] = useState<number | null>(null);
   const [newSheetName, setNewSheetName] = useState('');
 
@@ -26,7 +26,7 @@ export function SheetsBar() {
   };
 
   const handleSheetClick = (sheetId: number) => {
-    setActiveSheetId(sheetId);
+    setActiveSheet(sheetId);
   };
 
   const handleDoubleClick = (sheet: Sheet) => {
@@ -52,7 +52,7 @@ export function SheetsBar() {
             className={`
               flex items-center px-3 py-1 min-w-[100px] max-w-[200px]
               text-sm cursor-pointer select-none
-              ${activeSheetId === sheet.id 
+              ${activeSheet.id === sheet.id 
                 ? 'bg-white border-t-2 border-t-green-700 border-x' 
                 : 'hover:bg-gray-100'}
             `}

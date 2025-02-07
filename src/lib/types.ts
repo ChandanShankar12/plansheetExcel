@@ -1,3 +1,6 @@
+import { Cell } from '@/server/models/cell';
+import { Sheet } from '@/server/models/sheet';
+
 export interface CellData {
   value: string;
   formula?: string;
@@ -16,9 +19,7 @@ export interface CellStyle {
   align?: 'left' | 'center' | 'right';
 }
 
-export interface SheetData {
-  [cellId: string]: CellData;
-}
+export type SheetData = Record<string, Cell>;
 
 export interface SpreadsheetData {
   [sheetId: string]: SheetData;

@@ -3,8 +3,10 @@
 // Import necessary dependencies
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { useState, useRef, useEffect } from 'react';
-import { CellStyle } from '@/lib/spreadsheet/types';
+import { CellStyle } from '@/lib/types';
 import { Cells } from './cells';
+import { CellController } from '@/server/controllers/cell-controller';
+import { SheetController } from '@/server/controllers/sheet-controller';
 
 
 // Interface for cell selection with start and end coordinates
@@ -26,17 +28,16 @@ export function Grid() {
   const {
     activeCell,
     setActiveCell,
-    data,
+    activeSheet,
     updateCell,
     undo,
     redo,
     canUndo,
     canRedo,
-    setData,
-    activeSheetId,
     selection,
     setSelection,
   } = useSpreadsheetContext();
+  
 
   // State for context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -63,8 +64,8 @@ export function Grid() {
 
   // Helper function to convert cell ID (e.g. 'A1') to coordinates
   const getCellCoords = (cellId: string) => {
-    const col = cellId.match(/[A-Z]+/)?.[0] || '';
-    const row = parseInt(cellId.match(/\d+/)?.[0] || '0');
+    const col = cellId.match(/[A-Z]+/)?.[0] || 'A';
+    const row = parseInt(cellId.match(/\d+/)?.[0] || '1');
     return { col, row };
   };
 
@@ -153,7 +154,7 @@ export function Grid() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         const selectedCells = selection
           ? getSelectedCellsData()
-          : data[`${activeSheetId}_${activeCell}`]?.value || '';
+          : SheetController.getCell(activeSheet, activeCell).getValue();
         navigator.clipboard.writeText(selectedCells);
       }
 
@@ -161,12 +162,14 @@ export function Grid() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
         const selectedCells = selection
           ? getSelectedCellsData()
-          : data[`${activeSheetId}_${activeCell}`]?.value || '';
+          : SheetController.getCell(activeSheet, activeCell).getValue();
         navigator.clipboard.writeText(selectedCells);
         if (selection) {
           clearSelectedCells();
         } else {
-          updateCell(activeCell, { value: '' });
+          const cell = SheetController.getCell(activeSheet, activeCell);
+          cell.clear();
+          updateCell(activeCell, cell);
         }
       }
 
@@ -176,7 +179,9 @@ export function Grid() {
           if (selection) {
             pasteToSelection(text);
           } else {
-            updateCell(activeCell, { value: text });
+            const cell = SheetController.getCell(activeSheet, activeCell);
+            CellController.updateCellValue(cell, text);
+            updateCell(activeCell, cell);
           }
         });
       }
@@ -194,22 +199,14 @@ export function Grid() {
         handleMouseUp();
       }
 
-      // Undo (Ctrl/Cmd + Z)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        if (canUndo) {
-          undo();
-        }
-      }
-
-      // Redo (Ctrl/Cmd + Shift + Z) or (Ctrl/Cmd + Y)
-      if (
-        (e.ctrlKey || e.metaKey) &&
-        ((e.shiftKey && e.key === 'z') || e.key === 'y')
-      ) {
-        e.preventDefault();
-        if (canRedo) {
+      // Undo/Redo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey && canRedo) {
+          e.preventDefault();
           redo();
+        } else if (canUndo) {
+          e.preventDefault();
+          undo();
         }
       }
     };
@@ -218,7 +215,7 @@ export function Grid() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
     activeCell,
-    data,
+    activeSheet,
     isDragging,
     selection,
     updateCell,
@@ -231,42 +228,26 @@ export function Grid() {
   // Helper function to get data from selected cells
   const getSelectedCellsData = () => {
     if (!selection) return '';
-    const { col: startCol, row: startRow } = getCellCoords(selection.start);
-    const { col: endCol, row: endRow } = getCellCoords(selection.end);
-
-    const minCol = Math.min(startCol.charCodeAt(0), endCol.charCodeAt(0));
-    const maxCol = Math.max(startCol.charCodeAt(0), endCol.charCodeAt(0));
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-
-    let result = '';
-    for (let row = minRow; row <= maxRow; row++) {
-      for (let col = minCol; col <= maxCol; col++) {
-        const cellId = `${String.fromCharCode(col)}${row}`;
-        result += (data[`${activeSheetId}_${cellId}`]?.value || '') + '\t';
-      }
-      result = result.trim() + '\n';
-    }
-    return result.trim();
+    const cells = SheetController.getCellsInRange(
+      activeSheet,
+      selection.start,
+      selection.end
+    );
+    return cells.map(cell => cell.getValue()).join('\t');
   };
 
   // Clear all cells in selection
   const clearSelectedCells = () => {
     if (!selection) return;
-    const { col: startCol, row: startRow } = getCellCoords(selection.start);
-    const { col: endCol, row: endRow } = getCellCoords(selection.end);
-
-    const minCol = Math.min(startCol.charCodeAt(0), endCol.charCodeAt(0));
-    const maxCol = Math.max(startCol.charCodeAt(0), endCol.charCodeAt(0));
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-
-    for (let row = minRow; row <= maxRow; row++) {
-      for (let col = minCol; col <= maxCol; col++) {
-        const cellId = `${String.fromCharCode(col)}${row}`;
-        updateCell(cellId, { value: '' });
-      }
-    }
+    const cells = SheetController.getCellsInRange(
+      activeSheet,
+      selection.start,
+      selection.end
+    );
+    cells.forEach(cell => {
+      cell.clear();
+      updateCell(cell.getCellReference(), cell);
+    });
   };
 
   // Paste data into selected cells
@@ -278,11 +259,13 @@ export function Grid() {
     const { col: startCol, row: startRow } = getCellCoords(startCell);
     rows.forEach((row, rowIndex) => {
       const cells = row.split('\t');
-      cells.forEach((cell, colIndex) => {
+      cells.forEach((cellValue, colIndex) => {
         const newCol = String.fromCharCode(startCol.charCodeAt(0) + colIndex);
         const newRow = startRow + rowIndex;
         const cellId = `${newCol}${newRow}`;
-        updateCell(cellId, { value: cell });
+        const cell = SheetController.getCell(activeSheet, cellId);
+        CellController.updateCellValue(cell, cellValue);
+        updateCell(cellId, cell);
       });
     });
   };
@@ -350,82 +333,40 @@ export function Grid() {
 
   // Clear content from a column
   const clearColumnContent = (col: string) => {
-    const newData = { ...data };
-    // Only clear the content, keep the column
     rows.forEach((row) => {
       const cellId = `${col}${row}`;
-      if (newData[`${activeSheetId}_${cellId}`]) {
-        newData[`${activeSheetId}_${cellId}`] = {
-          ...newData[`${activeSheetId}_${cellId}`],
-          value: '',
-        };
-      }
+      const cell = SheetController.getCell(activeSheet, cellId);
+      cell.clear();
+      updateCell(cellId, cell);
     });
-    setData(newData);
     setSelection(null);
     setContextMenu(null);
   };
 
   // Clear content from a row
   const clearRowContent = (row: number) => {
-    const newData = { ...data };
-    // Only clear the content, keep the row
     columns.forEach((col) => {
       const cellId = `${col}${row}`;
-      if (newData[`${activeSheetId}_${cellId}`]) {
-        newData[`${activeSheetId}_${cellId}`] = {
-          ...newData[`${activeSheetId}_${cellId}`],
-          value: '',
-        };
-      }
+      const cell = SheetController.getCell(activeSheet, cellId);
+      cell.clear();
+      updateCell(cellId, cell);
     });
-    setData(newData);
     setSelection(null);
     setContextMenu(null);
   };
 
   // Delete a column and shift remaining columns left
   const deleteColumn = (col: string) => {
-    const newData = { ...data };
-    // Delete the column and shift remaining columns left
-    rows.forEach((row) => {
-      let currentCol = col;
-      while (currentCol < 'Z') {
-        const nextCol = String.fromCharCode(currentCol.charCodeAt(0) + 1);
-        const currentCellId = `${currentCol}${row}`;
-        const nextCellId = `${nextCol}${row}`;
-        newData[`${activeSheetId}_${currentCellId}`] = newData[
-          `${activeSheetId}_${nextCellId}`
-        ] || { value: '' };
-        currentCol = nextCol;
-      }
-      // Delete the last column
-      delete newData[`${activeSheetId}_${col}${row}`];
-    });
-    setData(newData);
+    SheetController.clearColumn(activeSheet, col);
+    SheetController.shiftColumnsLeft(activeSheet, col);
     setSelection(null);
     setContextMenu(null);
   };
 
-  // Delete a row and shift remaining rows up
+  // Delete a row and shift remaining rows up 
   const deleteRow = (row: number) => {
-    const newData = { ...data };
-    // Delete the row and shift remaining rows up
-    columns.forEach((col) => {
-      let currentRow = row;
-      while (currentRow < rows.length) {
-        const nextRow = currentRow + 1;
-        const currentCellId = `${col}${currentRow}`;
-        const nextCellId = `${col}${nextRow}`;
-        newData[`${activeSheetId}_${currentCellId}`] = newData[
-          `${activeSheetId}_${nextCellId}`
-        ] || { value: '' };
-        currentRow = nextRow;
-      }
-      // Delete the last row
-      delete newData[`${activeSheetId}_${col}${rows.length}`];
-    });
-    setData(newData);
+    SheetController.clearRow(activeSheet, row);
+    SheetController.shiftRowsUp(activeSheet, row);
     setSelection(null);
     setContextMenu(null);
   };
@@ -496,7 +437,7 @@ export function Grid() {
   });
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={gridRef}>
       {/* Header row with corner cell */}
       <div className="sticky top-0 z-10 flex bg-white">
         {/* Corner cell */}

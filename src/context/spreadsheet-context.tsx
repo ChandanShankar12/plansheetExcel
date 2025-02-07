@@ -1,29 +1,32 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { CellData, Selection, SheetMetadata } from '@/lib/spreadsheet/types';
+import { Selection } from '@/lib/types';
+import { Cell } from '@/server/models/cell';
+import { Sheet } from '@/server/models/sheet';
+import { Spreadsheet } from '@/server/models/spreadsheet';
+import { SheetController } from '@/server/controllers/sheet-controller';
+import { SpreadsheetController } from '@/server/controllers/spreadsheet-controller';
 
 interface HistoryState {
-  data: Record<string, CellData>;
+  sheet: Sheet;
   activeCell: string | null;
 }
 
 interface SpreadsheetContextType {
   activeCell: string | null;
   setActiveCell: (cell: string | null) => void;
-  data: Record<string, CellData>;
-  setData: (data: Record<string, CellData>) => void;
-  updateCell: (cellId: string, updates: Partial<CellData>) => void;
+  activeSheet: Sheet;
+  setActiveSheet: (sheet: Sheet) => void;
+  updateCell: (cellId: string, cell: Cell) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  sheetId: number;
-  activeSheetId: number;
-  setActiveSheetId: (id: number) => void;
-  sheets: SheetMetadata[];
+  spreadsheet: Spreadsheet;
+  sheets: Sheet[];
   addSheet: (name: string) => void;
-  userId: number;
+  userId: string;
   selection: Selection | null;
   setSelection: (selection: Selection | null) => void;
 }
@@ -39,15 +42,30 @@ export function SpreadsheetProvider({
 }: {
   children: React.ReactNode;
 }) {
+  // Initialize Spreadsheet
+  const [spreadsheet] = useState(() => new Spreadsheet());
   const [activeCell, setActiveCell] = useState<string | null>(null);
-  const [data, setData] = useState<Record<string | number, CellData>>({});
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [sheetId] = useState<number>(1);
-  const [sheets, setSheets] = useState<SheetMetadata[]>([]);
-  const [activeSheetId, setActiveSheetId] = useState<number>(1);
-  const [userId] = useState<number>(1);
+  const [userId] = useState('1');
   const [selection, setSelection] = useState<Selection | null>(null);
+
+  // Initialize first sheet
+  useEffect(() => {
+    if (!spreadsheet.getSheet('Sheet 1')) {
+      SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
+    }
+  }, [spreadsheet]);
+
+  const [activeSheet, setActiveSheet] = useState<Sheet>(() => {
+    const firstSheet = spreadsheet.getSheet('Sheet 1');
+    if (!firstSheet) {
+      const newSheet = new Sheet('Sheet 1');
+      SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
+      return newSheet;
+    }
+    return firstSheet;
+  });
 
   const pushToHistory = (newState: HistoryState) => {
     const newHistory = [...history.slice(0, currentIndex + 1), newState];
@@ -58,27 +76,34 @@ export function SpreadsheetProvider({
     setCurrentIndex(newHistory.length - 1);
   };
 
-  const updateCell = (cellId: string, updates: Partial<CellData>) => {
-    setData((prev) => {
-      const newData = {
-        ...prev,
-        [cellId]: { ...prev[cellId], ...updates },
-      };
+  const updateCell = (cellId: string, cell: Cell) => {
+    const updatedSheet = new Sheet(activeSheet.name);
+    updatedSheet.id = activeSheet.id;
+    
+    // Copy all existing cells
+    activeSheet.getAllCells().forEach((existingCell, key) => {
+      if (key !== cellId) {
+        updatedSheet.cells.set(key, existingCell.clone());
+      }
+    });
 
-      // Push to history
-      pushToHistory({
-        data: newData,
-        activeCell,
-      });
+    // Set the updated cell
+    updatedSheet.cells.set(cellId, cell);
 
-      return newData;
+    // Update active sheet
+    setActiveSheet(updatedSheet);
+
+    // Push to history
+    pushToHistory({
+      sheet: updatedSheet,
+      activeCell,
     });
   };
 
   const undo = () => {
     if (currentIndex > 0) {
       const previousState = history[currentIndex - 1];
-      setData(previousState.data);
+      setActiveSheet(previousState.sheet);
       setActiveCell(previousState.activeCell);
       setCurrentIndex(currentIndex - 1);
     }
@@ -87,88 +112,31 @@ export function SpreadsheetProvider({
   const redo = () => {
     if (currentIndex < history.length - 1) {
       const nextState = history[currentIndex + 1];
-      setData(nextState.data);
+      setActiveSheet(nextState.sheet);
       setActiveCell(nextState.activeCell);
       setCurrentIndex(currentIndex + 1);
     }
   };
 
   const addSheet = (name: string) => {
-    const newSheet: SheetMetadata = {
-      id: Date.now(),
-      name,
-      userId: userId.toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false,
-    };
-    setSheets([...sheets, newSheet]);
-    setActiveSheetId(newSheet.id);
+    const newSheet = SpreadsheetController.addSheet(spreadsheet, name);
+    setActiveSheet(newSheet);
   };
-  console.log(
-    activeCell,
-    setActiveCell,
-    data,
-    setData,
-    updateCell,
-    undo,
-    redo,
-    // canUndo,
-    // canRedo,
-    sheetId,
-    activeSheetId,
-    setActiveSheetId,
-    sheets,
-    addSheet,
-    userId,
-    selection,
-    setSelection
-  );
-
-  // useEffect(() => {
-  //   const loadWorkbookData = async () => {
-  //     try {
-  //       const response = await fetch(`/api/cells?sheetId=${activeSheetId}&userId=${userId}`);
-  //       if (!response.ok) throw new Error('Failed to load workbook');
-
-  //       const cells = await response.json();
-  //       const newData: Record<string, CellData> = {};
-
-  //       cells.forEach((cell: Sheet) => {
-  //         const colLetter = String.fromCharCode(64 + cell.columnIndex);
-  //         const cellId = `${activeSheetId}_${colLetter}${cell.rowIndex}`;
-  //         newData[cellId] = {
-  //           value: cell.value || '',
-  //           style: cell.metadata?.style || {},
-  //           formula: cell.metadata?.formula
-  //         };
-  //       });
-
-  //       setData(newData);
-  //     } catch (error) {
-  //       console.error('Error loading workbook:', error);
-  //     }
-  //   };
-
-  //   loadWorkbookData();
-  // }, [activeSheetId, userId]);
 
   return (
     <SpreadsheetContext.Provider
       value={{
         activeCell,
         setActiveCell,
-        data,
-        setData,
+        activeSheet,
+        setActiveSheet,
         updateCell,
         undo,
         redo,
         canUndo: currentIndex > 0,
         canRedo: currentIndex < history.length - 1,
-        sheetId,
-        activeSheetId,
-        setActiveSheetId,
-        sheets,
+        spreadsheet,
+        sheets: spreadsheet.sheets,
         addSheet,
         userId,
         selection,
@@ -179,7 +147,6 @@ export function SpreadsheetProvider({
     </SpreadsheetContext.Provider>
   );
 }
-
 
 export function useSpreadsheetContext() {
   const context = useContext(SpreadsheetContext);

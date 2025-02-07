@@ -1,60 +1,78 @@
-import { pgTable, serial, text, integer, jsonb, uuid, varchar } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, uuid, varchar, timestamp, boolean } from "drizzle-orm/pg-core";
 
-// Table Schema
-export const workbook = pgTable("workbook", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  userId: integer("user_id").notNull(),
-  sheetId: integer("sheet_id").notNull(),
-  rowIndex: integer("row_index").notNull(),
-  columnIndex: integer("column_index").notNull(),
-  value: varchar("value").$type<string | number | null>(),
-  metadata: jsonb("metadata").$type<{
-    style?: CellStyle;
-    formula?: string;
-  }>().default({}),
-  mergedWith: text("merged_with").$type<string | null>(),
+
+/**
+ * Database Schema Overview:
+ * 
+ * Application Table:
+ * - Stores metadata about the spreadsheet application
+ * - Contains version info, app settings, etc.
+ * 
+ * Spreadsheet Table:
+ * - Represents a complete spreadsheet document (like an Excel file)
+ * - Contains metadata and links to workbooks
+ * 
+ * Workbook Table:
+ * - Represents a collection of sheets within a spreadsheet
+ * - Organizes related sheets together
+ * 
+ * Sheet Table:
+ * - Represents a single sheet/tab inside a workbook
+ * - Contains grid of cells and sheet-specific settings
+ * 
+ * Cell Table:
+ * - Stores individual cell data within a sheet
+ * - Contains values, formulas, formatting, etc.
+ * 
+
+ */
+
+
+export const application = pgTable("application", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workbooks: jsonb("workbooks"), // Map<string, Workbook>
+  activeWorkbookId: varchar("active_workbook_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Types for type safety
-export type Workbook = typeof workbook.$inferInsert;
-export type CellData = typeof workbook.$inferInsert;
-// export type NewWorkbook = typeof workbook.$inferInsert;
+// 2️⃣ Spreadsheet Table
+export const spreadsheets = pgTable("spreadsheets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sheets: jsonb("sheets"), // Sheet[]
+  activeSheetId: integer("active_sheet_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export type CellStyle = {
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  backgroundColor?: string;
-  textColor?: string;
-  fontSize?: number;
-  fontFamily?: string;
-  alignment?: 'left' | 'center' | 'right';
-  verticalAlignment?: 'top' | 'middle' | 'bottom';
-  borders?: {
-    top?: string;
-    right?: string; 
-    bottom?: string;
-    left?: string;
-  };
-};
+// 3️⃣ Workbook Table 
+export const workbooks = pgTable("workbooks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  spreadsheet: jsonb("spreadsheet"), // Spreadsheet
+  config: jsonb("config"), // UserConfig interface
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  theme: varchar("theme", { length: 10 }).notNull(), // 'light' | 'dark'
+  language: varchar("language", { length: 10 }).notNull(),
+  timezone: varchar("timezone", { length: 100 }).notNull(),
+  autoSave: boolean("auto_save").notNull(),
+  lastModified: timestamp("last_modified").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-export type CellMetadata = {
-  style?: CellStyle;
-  formula?: string;
-  comment?: string;
-  validation?: {
-    type: 'list' | 'number' | 'date' | 'text';
-    params: unknown;
-  };
-  locked?: boolean;
-  mergeGroup?: string;
-};
+// 4️⃣ Sheet Table
+export const sheets = pgTable("sheets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  cells: jsonb("cells"), // Map<string, Cell>
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
-// Add this interface
-export interface CellUpdate {
-  value: any;
-  metadata?: {
-    style?: Record<string, any>;
-    formula?: string;
-  };
-}
+// 5️⃣ Cell Table
+export const cells = pgTable("cells", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  value: text("value").notNull(),
+  formula: text("formula").notNull(),
+  row: integer("row").notNull(),
+  column: varchar("column", { length: 10 }).notNull(),
+  style: jsonb("style"), // Cell style object
+  createdAt: timestamp("created_at").defaultNow(),
+});
+

@@ -1,41 +1,79 @@
 # XO
 
-``` mermaid
+```mermaid
 classDiagram
-    class Spreadsheet {
-        - List<Sheet> sheets
-        + addSheet(name: String): void
-        + getSheet(name: String): Sheet
-        + removeSheet(name: String): void
+    %% Core Components
+    class Application {
+        -workbooks: Workbook[]
+        +openWorkbook(filePath: string): Workbook
+        +createNewWorkbook(): Workbook
+        +closeWorkbook(workbook: Workbook): void
     }
 
-    class Sheet {
-        - String name
-        - List<List<Cell>> cells
-        + getCell(row: int, col: int): Cell
-        + setCell(row: int, col: int, value: String): void
+    class Workbook {
+        -sheets: Worksheet[]
+        -metadata: Metadata
+        +addSheet(sheet: Worksheet): void
+        +removeSheet(sheetName: string): void
+        +getSheet(sheetName: string): Worksheet
+    }
+
+    class Worksheet {
+        -cells: Cell[][]
+        +getCell(row: int, col: int): Cell
+        +setCell(row: int, col: int, value: string): void
     }
 
     class Cell {
-        - String value
-        - String formula
-        + setValue(value: String): void
-        + setFormula(formula: String): void
-        + evaluate(): String
+        -value: string
+        -formula: string
+        -format: CellFormat
+        +getValue(): string
+        +setValue(value: string): void
+        +evaluateFormula(): string
     }
 
-    class FormulaParser {
-        + parseFormula(formula: String, sheet: Sheet): String
+    class FormulaEngine {
+        +evaluate(expression: string, context: Cell): string
     }
 
-    class FileHandler {
-        + openFile(path: String): Spreadsheet
-        + saveFile(spreadsheet: Spreadsheet, path: String): void
-        + exportToCSV(sheet: Sheet, path: String): void
+    class Metadata {
+        -author: string
+        -createdDate: Date
+        -modifiedDate: Date
     }
 
-    Spreadsheet --> Sheet : contains
-    Sheet --> Cell : contains
-    Cell --> FormulaParser : uses
-    Spreadsheet --> FileHandler : interacts
+    class CellFormat {
+        -font: string
+        -color: string
+        -border: string
+        +applyFormat(cell: Cell): void
+    }
+
+    class Storage {
+        +saveWorkbook(workbook: Workbook, filePath: string): void
+        +loadWorkbook(filePath: string): Workbook
+    }
+
+    class UI {
+        +render(workbook: Workbook): void
+        +handleUserInput(input: Event): void
+    }
+
+    class Scripting {
+        +executeMacro(macro: string): void
+    }
+
+    %% Relationships
+    Application --> Workbook : manages
+    Workbook --> Worksheet : contains
+    Worksheet --> Cell : contains
+    Cell --> FormulaEngine : uses
+    Workbook --> Metadata : has
+    Cell --> CellFormat : uses
+    Application --> Storage : interacts with
+    UI --> Application : interacts with
+    Scripting --> Workbook : modifies
+
+
 ```
