@@ -1,26 +1,24 @@
-import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
-
+import { pgTable, serial, text, integer, jsonb, uuid, varchar } from "drizzle-orm/pg-core";
 
 // Table Schema
 export const workbook = pgTable("workbook", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  sheetId: text("sheet_id").notNull(),
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull(),
+  sheetId: integer("sheet_id").notNull(),
   rowIndex: integer("row_index").notNull(),
   columnIndex: integer("column_index").notNull(),
-  value: text("value"),
+  value: varchar("value").$type<string | number | null>(),
   metadata: jsonb("metadata").$type<{
-    style?: Record<string, any>;
+    style?: CellStyle;
     formula?: string;
   }>().default({}),
-  mergedWith: text("merged_with"), // If part of a merged group, stores the ID of the primary (anchor) cell
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow()
+  mergedWith: text("merged_with").$type<string | null>(),
 });
 
 // Types for type safety
-export type Workbook = typeof workbook.$inferSelect;
-export type NewWorkbook = typeof workbook.$inferInsert;
+export type Workbook = typeof workbook.$inferInsert;
+export type CellData = typeof workbook.$inferInsert;
+// export type NewWorkbook = typeof workbook.$inferInsert;
 
 export type CellStyle = {
   bold?: boolean;
@@ -54,26 +52,9 @@ export type CellMetadata = {
 
 // Add this interface
 export interface CellUpdate {
-  value: string;
+  value: any;
   metadata?: {
     style?: Record<string, any>;
     formula?: string;
   };
-}
-
-// Update the Sheet type
-export interface Sheet {
-  id: number;
-  userId: string;
-  sheetId: string;
-  rowIndex: number;
-  columnIndex: number;
-  value: string;
-  metadata: {
-    style?: Record<string, any>;
-    formula?: string;
-  };
-  mergedWith: string;
-  createdAt: Date;
-  updatedAt: Date;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 
 interface Sheet {
@@ -13,6 +13,12 @@ export function SheetsBar() {
   const { activeSheetId, setActiveSheetId, sheets, addSheet } = useSpreadsheetContext();
   const [editingSheet, setEditingSheet] = useState<number | null>(null);
   const [newSheetName, setNewSheetName] = useState('');
+
+  useEffect(() => {
+    if (sheets.length === 0) {
+      addSheet('Sheet1');
+    }
+  }, [sheets.length, addSheet]);
 
   const handleAddSheet = () => {
     const newSheetName = `Sheet${sheets.length + 1}`;

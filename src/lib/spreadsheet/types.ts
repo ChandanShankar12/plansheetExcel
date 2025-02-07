@@ -1,14 +1,3 @@
-export interface CellStyle {
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  align?: 'left' | 'center' | 'right';
-  fontFamily?: string;
-  fontSize?: number;
-  textColor?: string;
-  backgroundColor?: string;
-}
-
 export interface CellData {
   value: string;
   formula?: string;
@@ -16,8 +5,23 @@ export interface CellData {
   metadata?: Record<string, any>;
 }
 
+export interface CellStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  textColor?: string;
+  backgroundColor?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+export interface SheetData {
+  [cellId: string]: CellData;
+}
+
 export interface SpreadsheetData {
-  [key: string]: CellData;
+  [sheetId: string]: SheetData;
 }
 
 export interface SpreadsheetContextType {
@@ -26,7 +30,22 @@ export interface SpreadsheetContextType {
   updateCell: (cell: string, data: Partial<CellData>) => void;
   setActiveCell: (cell: string | null) => void;
 }
+
 export interface SpreadsheetHistory {
   past: Record<string, CellData>[];
   future: Record<string, CellData>[];
+}
+
+export interface Selection {
+  start: string;
+  end: string;
+}
+
+export interface SheetMetadata {
+  id: number;
+  name: string;
+  userId: string;
+  isDeleted?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

@@ -2,13 +2,10 @@
 
 // Import necessary dependencies
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { evaluateFormula } from '@/lib/spreadsheet';
 import { useState, useRef, useEffect } from 'react';
-import { CellData } from '@/lib/spreadsheet/types';
 import { CellStyle } from '@/lib/spreadsheet/types';
+import { Cells } from './cells';
 
-import { updateCellValue } from '@/lib/db/services/cell-service';
-import { storage } from '@/lib/db/services/json-storage';
 
 // Interface for cell selection with start and end coordinates
 interface Selection {
@@ -35,24 +32,14 @@ export function Grid() {
     redo,
     canUndo,
     canRedo,
-    spreadsheetId,
     setData,
     activeSheetId,
     selection,
     setSelection,
   } = useSpreadsheetContext();
 
-  // State for cell editing
-  const [editValue, setEditValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSelecting, setIsSelecting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
   // State for context menu
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-
-  // State for tracking cells being saved
-  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
 
   // State for column/row resizing
   const [resizing, setResizing] = useState<{
@@ -104,17 +91,15 @@ export function Grid() {
   const handleCellClick = (cellId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!isEditing) {
+    if (!isDragging) {
       setActiveCell(cellId);
-      if (!isDragging) {
-        setSelection({ start: cellId, end: cellId });
-      }
+      setSelection({ start: cellId, end: cellId });
     }
   };
 
   // Handle mouse down for starting cell selection
   const handleMouseDown = (cellId: string) => {
-    if (!isEditing) {
+    if (!isDragging) {
       setIsDragging(true);
       setActiveCell(cellId);
       setSelection({ start: cellId, end: cellId });
@@ -124,7 +109,10 @@ export function Grid() {
   // Handle mouse enter during drag selection
   const handleMouseEnter = (cellId: string) => {
     if (isDragging && selection) {
-      setSelection((prev) => (prev ? { ...prev, end: cellId } : null));
+      setSelection({ 
+        start: selection.start, 
+        end: cellId 
+      });
     }
   };
 
@@ -142,53 +130,13 @@ export function Grid() {
   // Handle double click to start cell editing
   const handleCellDoubleClick = (cellId: string) => {
     setActiveCell(cellId);
-    setIsEditing(true);
-    const cellKey = `${activeSheetId}_${cellId}`;
-    setEditValue(data[cellKey]?.value || '');
-  };
-
-  // Handle cell value updates and storage
-  const handleCellUpdate = async (cellId: string, value: string) => {
-    try {
-      setSavingCells((prev) => new Set(prev).add(cellId));
-
-      // Update UI immediately
-      updateCell(`${activeSheetId}_${cellId}`, { value });
-
-      // Update storage
-      storage.updateCell(spreadsheetId, activeSheetId, cellId, {
-        value,
-        formula: value.startsWith('=') ? value : undefined,
-        style: data[`${activeSheetId}_${cellId}`]?.style || {},
-        metadata: data[`${activeSheetId}_${cellId}`]?.metadata || {},
-      });
-    } catch (error) {
-      console.error('Failed to update cell:', error);
-    } finally {
-      setSavingCells((prev) => {
-        const next = new Set(prev);
-        next.delete(cellId);
-        return next;
-      });
-    }
-  };
-
-  // Stop editing and save cell value
-  const stopEditing = () => {
-    if (
-      activeCell &&
-      editValue !== data[`${activeSheetId}_${activeCell}`]?.value
-    ) {
-      handleCellUpdate(activeCell, editValue);
-    }
-    setIsEditing(false);
-    setEditValue('');
+    setIsDragging(true);
   };
 
   // Handle keyboard shortcuts and navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!activeCell || isEditing) return;
+      if (!activeCell || isDragging) return;
 
       // Save (Ctrl/Cmd + S)
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -236,14 +184,14 @@ export function Grid() {
       // Start editing on F2 or when typing any character
       if (
         e.key === 'F2' ||
-        (!isEditing && e.key.length === 1 && !e.ctrlKey && !e.metaKey)
+        (!isDragging && e.key.length === 1 && !e.ctrlKey && !e.metaKey)
       ) {
         handleCellDoubleClick(activeCell);
       }
 
       // Finish editing on Enter
       if (e.key === 'Enter') {
-        stopEditing();
+        handleMouseUp();
       }
 
       // Undo (Ctrl/Cmd + Z)
@@ -271,7 +219,7 @@ export function Grid() {
   }, [
     activeCell,
     data,
-    isEditing,
+    isDragging,
     selection,
     updateCell,
     undo,
@@ -279,13 +227,6 @@ export function Grid() {
     canUndo,
     canRedo,
   ]);
-
-  // Focus input when editing starts
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
 
   // Helper function to get data from selected cells
   const getSelectedCellsData = () => {
@@ -596,11 +537,7 @@ export function Grid() {
                   bg-[#f8f9fa] text-[#666] font-medium
                   flex items-center justify-center text-xs
                   hover:bg-gray-100 cursor-pointer
-                  ${
-                    selection?.start.endsWith(row.toString())
-                      ? 'bg-[#e6f0eb]'
-                      : ''
-                  }
+                  ${selection?.start.endsWith(row.toString()) ? 'bg-[#e6f0eb]' : ''}
                 `}
                 onContextMenu={(e) => handleRowContextMenu(e, row)}
               >
@@ -613,74 +550,13 @@ export function Grid() {
         </div>
 
         {/* Cells Grid Container */}
-        <div className="flex-1">
-          {/* Row Container - Maps through numeric rows (1-100) */}
-          {rows.map((row: number) => (
-            <div key={row} className="flex h-[20px]">
-              {/* Column Container - Maps through letter columns (A-Z) */}
-              {columns.map((col: string) => {
-                // Cell identification and data retrieval
-                const cellId: string = `${col}${row}`; // e.g. "A1", "B2"
-                const cellKey: string = `${activeSheetId}_${cellId}`; // Unique key including sheet ID
-                const cellData: CellData | undefined = data[cellKey]; // Get cell data from spreadsheet context
-                const isActive: boolean = activeCell === cellId;
-                const cellStyle: CellStyle = cellData?.style || {}; // Get cell styling or empty object
-                const computedStyles: React.CSSProperties = getCellStyles(cellStyle);
-
-                return (
-                  <div
-                    key={cellId}
-                    className={`
-                      w-[80px] h-[20px] shrink-0 border-r border-b 
-                      relative cursor-cell select-none
-                      ${isActive ? 'ring-2 ring-[#166534] ring-inset' : ''}
-                      hover:bg-gray-50
-                    `}
-                    style={computedStyles}
-                    onClick={(e: React.MouseEvent) => handleCellClick(cellId, e)}
-                    onDoubleClick={() => handleCellDoubleClick(cellId)}
-                  >
-                    {/* Cell Content - Switches between edit mode input and display mode */}
-                    {isEditing && isActive ? (
-                      // Edit Mode - Input Field
-                      <input
-                        ref={inputRef} // Reference for focus management
-                        value={editValue} // Controlled input value
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditValue(e.target.value)}
-                        onBlur={stopEditing} // Handle focus loss
-                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                          if (e.key === 'Enter') {
-                            stopEditing(); // Save on Enter
-                          } else if (e.key === 'Escape') {
-                            stopEditing(); // Cancel on Escape
-                            setEditValue(data[cellKey]?.value || '');
-                          }
-                        }}
-                        className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
-                        style={{
-                          ...computedStyles,
-                          lineHeight: '20px',
-                        }}
-                        autoFocus
-                      />
-                    ) : (
-                      // Display Mode - Cell Value
-                      <div
-                        className="px-1 truncate h-full flex items-center"
-                        style={computedStyles}
-                      >
-                        {/* Evaluate and display cell value or formula result */}
-                        {cellData?.value
-                          ? evaluateFormula(cellData.value, data)
-                          : ''}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        <Cells
+          rows={rows}
+          columns={columns}
+          getCellStyles={getCellStyles}
+          isDragging={isDragging}
+          setIsDragging={setIsDragging}
+        />
       </div>
     </div>
   );
