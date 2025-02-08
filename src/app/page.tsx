@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { SpreadsheetProvider } from '@/context/spreadsheet-context';
 import { Spreadsheet } from '@/components/spreadsheet';
 import { ProjectBar } from '@/components/spreadsheet/projectbar';
@@ -6,10 +9,18 @@ import { SheetsBar } from '@/components/spreadsheet/sheets-bar';
 import { AppStatusBar } from '@/components/spreadsheet/appstatus-bar';
 import { FloatingModal } from '@/components/ai/floating_modal';
 import { Aside } from '@/components/Aside';
+import SplashScreen from '@/components/SplashScreen';
+import { Grid } from '@/components/spreadsheet/grid';
 
-export default function Page() {
+export default function Home() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <SpreadsheetProvider>
+      <SplashScreen 
+        isOpen={showSplash} 
+        onClose={() => setShowSplash(false)} 
+      />
       <div className="flex flex-col h-full max-h-full">
         {/* Main Content + Aside */}
         <div className="flex flex-1 min-h-0 overflow-hidden">

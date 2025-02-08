@@ -1,94 +1,84 @@
 import { NextResponse } from 'next/server';
 import { redis } from '@/cache/redis_client';
-import { CellData } from '@/lib/spreadsheet/types';
+import { CellStyle } from '@/lib/types';
+import { Cell } from '@/server/models/cell';
+import { Sheet } from '@/server/models/sheet';
 import { db } from '@/db/db';
-import { workbook } from '@/db/schema';
+import { cells } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
+
+interface CellRequest {
+  sheetId: string;
+  cellId: string;
+  value: string;
+  formula?: string;
+  style?: CellStyle;
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { userId, sheetId, cellId, value, formula } = body;
+    const body: CellRequest = await request.json();
+    const { sheetId, cellId, value, formula, style } = body;
 
-    if (!userId || !sheetId || !cellId) {
+    if (!sheetId || !cellId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Extract row and column from cellId (e.g. 'A1' -> row: 1, col: 1)
-    const colLetter = cellId.match(/[A-Z]+/)?.[0] || 'A';
-    const rowIndex = parseInt(cellId.match(/\d+/)?.[0] || '1');
-    const columnIndex = colLetter.charCodeAt(0) - 64; // Convert A->1, B->2, etc.
-
-    // Create data object matching the schema
-    const cellData = {
-      userId: BigInt(userId),
-      sheetId: BigInt(sheetId),
-      rowIndex: rowIndex,
-      columnIndex: columnIndex,
-      value: value || null,
-      metadata: {
-        formula: formula || undefined,
-        style: {}
-      },
-      mergedWith: null
-    };
-
-    try {
-      // Try to update first
-      const result = await db.update(workbook)
-        .set({
-          ...cellData,
-          userId: cellData.userId.toString(),
-          sheetId: cellData.sheetId.toString(),
-        })
-        .where(
-          and(
-            eq(workbook.userId, cellData.userId.toString()),
-            eq(workbook.sheetId, cellData.sheetId.toString()),
-            eq(workbook.rowIndex, cellData.rowIndex),
-            eq(workbook.columnIndex, cellData.columnIndex)
-          )
-        )
-        .returning();
-
-      // If no rows were updated, insert new record
-      if (!result.length) {
-        await db.insert(workbook)
-          .values({
-            ...cellData,
-            userId: cellData.userId.toString(),
-            sheetId: cellData.sheetId.toString(),
-          });
-      }
-
-      // Store in Redis cache
-      const redisKey = `cell:${userId}:${sheetId}:${cellId}`;
-      await redis.set(redisKey, JSON.stringify({
-        value: value,
-        formula: formula,
-        style: {}
-      }));
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          ...cellData,
-          userId: cellData.userId.toString(),
-          sheetId: cellData.sheetId.toString(),
-        }
-      });
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      throw new Error('Database operation failed');
+    // Parse cellId to get column and row
+    const colLetter = cellId.match(/[A-Z]+/)?.[0];
+    const rowIndex = parseInt(cellId.match(/\d+/)?.[0] || '0');
+    if (!colLetter || !rowIndex) {
+      return NextResponse.json(
+        { error: 'Invalid cell ID format' },
+        { status: 400 }
+      );
     }
+
+    // Create cell instance
+    const cell = new Cell();
+    cell.setValue(value);
+    if (formula) cell.setFormula(formula);
+    if (style) cell.style = style;
+    cell.column = colLetter;
+    cell.row = rowIndex;
+
+    // Save to database
+    const cellData = await db
+      .insert(cells)
+      .values({
+        value: value,
+        formula: formula || '',
+        row: rowIndex,
+        column: colLetter,
+        style: style || {},
+      })
+      .onConflictDoUpdate({
+        target: [cells.column, cells.row],
+        set: {
+          value: value,
+          formula: formula || '',
+          style: style || {},
+        }
+      })
+      .returning();
+
+    // Store in Redis cache
+    const redisKey = `cell:${sheetId}:${cellId}`;
+    const cellCache = cell.toJSON();
+    await redis.set(redisKey, JSON.stringify(cellCache));
+
+    return NextResponse.json({
+      success: true,
+      data: cellCache
+    });
 
   } catch (error) {
     console.error('Failed to update cell:', error);
     return NextResponse.json(
-      { error: 'Failed to update cell', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to update cell' },
       { status: 500 }
     );
   }
@@ -97,10 +87,9 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const sheetId = searchParams.get('sheetId');
 
-    if (!userId || !sheetId) {
+    if (!sheetId) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -109,30 +98,30 @@ export async function GET(request: Request) {
 
     // Get cells from database
     const dbCells = await db.select()
-      .from(workbook)
+      .from(cells)
       .where(
-        and(
-          eq(workbook.userId, Number(userId)),
-          eq(workbook.sheetId, Number(sheetId))
-        )
+        eq(cells.id, sheetId)
       );
 
     // Convert to cell format
-    const cells: Record<string, any> = {};
-    dbCells.forEach(cell => {
-      const colLetter = String.fromCharCode(64 + cell.columnIndex);
-      const cellId = `${colLetter}${cell.rowIndex}`;
-      cells[cellId] = {
-        value: cell.value,
-        formula: cell.metadata?.formula,
-        style: cell.metadata?.style || {}
-      };
+    const cellsMap: Record<string, any> = {};
+    dbCells.forEach(cellData => {
+      const cellId = `${cellData.column}${cellData.row}`;
+      const cell = new Cell();
+      cell.setValue(cellData.value);
+      cell.setFormula(cellData.formula);
+      cell.style = cellData.style;
+      cell.column = cellData.column;
+      cell.row = cellData.row;
+      
+      cellsMap[cellId] = cell.toJSON();
     });
 
     return NextResponse.json({
       success: true,
-      data: cells
+      data: cellsMap
     });
+
   } catch (error) {
     console.error('Failed to fetch cells:', error);
     return NextResponse.json(

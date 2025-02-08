@@ -4,8 +4,7 @@ node_modules/
 .next/
 .git/
 
-models/
-models/**
+STT-models/
 
 
 .env
