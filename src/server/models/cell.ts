@@ -1,5 +1,4 @@
 // src/server/models/Cell.ts
-import { parseFormula } from "../services/spreadsheet/FormulaParser";
 import { Sheet } from "./sheet";
 
 export class Cell {
@@ -29,10 +28,15 @@ export class Cell {
   }
 
   getValue(): string | number | null {
+    if (this.formula) {
+      return this.evaluate(this.sheet);
+    }
     return this.value;
   }
 
   setValue(value: string | number | null): void {
+    // Clear formula if setting a direct value
+    this.formula = "";
     this.value = value;
   }
 
@@ -42,20 +46,25 @@ export class Cell {
 
   setFormula(formula: string): void {
     this.formula = formula;
+    // When setting a formula, evaluate it immediately
+    this.value = this.evaluate(this.sheet);
   }
 
   evaluate(sheet: Sheet): string | number | null {
     if (this.formula) {
       try {
         if (this.formula.startsWith('=')) {
-          // For now, return the formula value without the '=' sign
+          // Basic formula evaluation - remove the '=' prefix
+          const formulaContent = this.formula.substring(1);
+          
+          // For now, just return the formula content
           // TODO: Implement proper formula evaluation
-          return this.formula.substring(1);
+          return formulaContent;
         }
         return this.formula;
       } catch (error) {
         console.error('Formula evaluation error:', error);
-        return this.value;
+        return this.formula; // Return the raw formula if evaluation fails
       }
     }
     return this.value;

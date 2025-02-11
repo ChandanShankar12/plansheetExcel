@@ -2,7 +2,6 @@
 
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { CellController } from '@/server/controllers/cell-controller';
-import { Cell as CellModel } from '@/server/models/cell';
 import { useState, useRef, useEffect } from 'react';
 
 interface CellProps {
@@ -35,9 +34,20 @@ export function Cell({
 
   const cell = activeSheet.getCell(cellId);
 
+  // Start editing when double clicked
+  const startEditing = () => {
+    const currentValue = cell.getValue();
+    setEditValue(currentValue?.toString() || '');
+    setIsEditing(true);
+  };
+
   // Handle cell value changes
   const handleValueChange = (value: string) => {
-    CellController.updateCellValue(cell, value);
+    if (value.startsWith('=')) {
+      CellController.updateCellValue(cell, value);
+    } else {
+      CellController.updateCellValue(cell, value);
+    }
     updateCell(cellId, cell);
   };
 
@@ -46,7 +56,6 @@ export function Cell({
     if (isEditing) {
       handleValueChange(editValue);
       setIsEditing(false);
-      setEditValue('');
     }
   };
 
@@ -56,6 +65,19 @@ export function Cell({
       inputRef.current.focus();
     }
   }, [isEditing]);
+
+  // Handle double click to start editing
+  useEffect(() => {
+    if (isActive && !isEditing) {
+      const handleKeyPress = (e: KeyboardEvent) => {
+        if (!isEditing && e.key.length === 1) {
+          startEditing();
+        }
+      };
+      window.addEventListener('keypress', handleKeyPress);
+      return () => window.removeEventListener('keypress', handleKeyPress);
+    }
+  }, [isActive, isEditing]);
 
   return (
     <div
@@ -67,7 +89,10 @@ export function Cell({
       `}
       style={style}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={() => {
+        onDoubleClick();
+        startEditing();
+      }}
       onMouseEnter={onMouseEnter}
     >
       {isEditing && isActive ? (
@@ -81,7 +106,7 @@ export function Cell({
               stopEditing();
             } else if (e.key === 'Escape') {
               setIsEditing(false);
-              setEditValue(cell.getValue().toString());
+              setEditValue(cell.getValue()?.toString() || '');
             }
           }}
           className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
@@ -93,7 +118,7 @@ export function Cell({
           className="px-1 truncate h-full flex items-center"
           style={style}
         >
-          {cell.getValue()}
+          {cell.getValue()?.toString() || ''}
         </div>
       )}
     </div>
