@@ -3,6 +3,7 @@
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { CellController } from '@/server/controllers/cell-controller';
 import { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
 
 interface CellProps {
   cellId: string;
@@ -28,7 +29,7 @@ export function Cell({
     updateCell 
   } = useSpreadsheetContext();
 
-  const [editValue, setEditValue] = useState('');
+  const [editValue, setEditValue] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,19 +38,37 @@ export function Cell({
   // Start editing when double clicked
   const startEditing = () => {
     const currentValue = cell.getValue();
-    setEditValue(currentValue?.toString() || '');
+    setEditValue(currentValue);
     setIsEditing(true);
   };
 
   // Handle cell value changes
-  const handleValueChange = (value: string) => {
-    if (value.startsWith('=')) {
-      CellController.updateCellValue(cell, value);
-    } else {
-      CellController.updateCellValue(cell, value);
-    }
+  const handleValueChange = async (value: string | number | null) => {
+    CellController.updateCellValue(cell, value);
     updateCell(cellId, cell);
+
+    // Send to API
+    try {
+      const response = await axios.post('/api/cells', {
+        sheetId: activeSheet.id,
+        cellId,
+        value: value,
+        formula: cell.getFormula(),
+        style: cell.style
+      });
+
+      if (!response.data.success) {
+        console.error('Failed to save cell:', response.data);
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error saving cell:', error.response?.data || error.message);
+      } else {
+        console.error('Error saving cell:', error);
+      }
+    }
   };
+
 
   // Stop editing and save cell value
   const stopEditing = () => {
@@ -98,15 +117,16 @@ export function Cell({
       {isEditing && isActive ? (
         <input
           ref={inputRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
+          value={editValue ?? ''}
+          onChange={(e) => {
+            setEditValue(e.target.value || null);
+          }}
           onBlur={stopEditing}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               stopEditing();
             } else if (e.key === 'Escape') {
               setIsEditing(false);
-              setEditValue(cell.getValue()?.toString() || '');
             }
           }}
           className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
@@ -118,7 +138,7 @@ export function Cell({
           className="px-1 truncate h-full flex items-center"
           style={style}
         >
-          {cell.getValue()?.toString() || ''}
+          {cell.getValue() ?? ''}
         </div>
       )}
     </div>

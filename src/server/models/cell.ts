@@ -3,7 +3,7 @@ import { Sheet } from "./sheet";
 
 export class Cell {
   id: string;
-  private value: string | number | null = null;
+  private value: string | null = null;
   private formula: string = "";
   sheet: Sheet;
   row: number;
@@ -22,12 +22,12 @@ export class Cell {
 
   constructor() {
     this.id = crypto.randomUUID();
-    this.value = "";
+    this.value = null;
     this.formula = "";
     this.style = {};
   }
 
-  getValue(): string | number | null {
+  getValue(): string | null {
     if (this.formula) {
       return this.evaluate(this.sheet);
     }
@@ -35,9 +35,8 @@ export class Cell {
   }
 
   setValue(value: string | number | null): void {
-    // Clear formula if setting a direct value
     this.formula = "";
-    this.value = value;
+    this.value = value === null ? null : String(value);
   }
 
   getFormula(): string {
@@ -46,25 +45,20 @@ export class Cell {
 
   setFormula(formula: string): void {
     this.formula = formula;
-    // When setting a formula, evaluate it immediately
     this.value = this.evaluate(this.sheet);
   }
 
-  evaluate(sheet: Sheet): string | number | null {
+  evaluate(sheet: Sheet): string | null {
     if (this.formula) {
       try {
         if (this.formula.startsWith('=')) {
-          // Basic formula evaluation - remove the '=' prefix
           const formulaContent = this.formula.substring(1);
-          
-          // For now, just return the formula content
-          // TODO: Implement proper formula evaluation
           return formulaContent;
         }
         return this.formula;
       } catch (error) {
         console.error('Formula evaluation error:', error);
-        return this.formula; // Return the raw formula if evaluation fails
+        return this.formula;
       }
     }
     return this.value;
@@ -114,7 +108,7 @@ export class Cell {
 
   // Clear cell contents
   clear(): void {
-    this.value = "";
+    this.value = null;
     this.formula = "";
   }
 

@@ -9,7 +9,7 @@ export async function updateCell(cellId: string, cell: Cell) {
     const rowIndex = parseInt(cellId.match(/\d+/)?.[0] || '0');
 
     await db.insert(cells).values({
-      value: cell.getValue()?.toString() || '',
+      value: cell.getValue(),
       formula: cell.getFormula() || '',
       column: colLetter || '',
       row: rowIndex,

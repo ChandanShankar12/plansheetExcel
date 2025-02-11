@@ -11,6 +11,7 @@ import { FloatingModal } from '@/components/ai/floating_modal';
 import { Aside } from '@/components/Aside';
 import SplashScreen from '@/components/SplashScreen';
 import { Grid } from '@/components/spreadsheet/grid';
+import { redis } from '@/server/db/cache/redis_client';
 
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true);

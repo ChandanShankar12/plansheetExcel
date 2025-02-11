@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, uuid, varchar, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, uuid, varchar, timestamp, boolean, unique } from "drizzle-orm/pg-core";
 
 
 /**
@@ -68,11 +68,16 @@ export const sheets = pgTable("sheets", {
 // 5️⃣ Cell Table
 export const cells = pgTable("cells", {
   id: uuid("id").defaultRandom().primaryKey(),
-  value: text("value"),  // Make value nullable
+  value: varchar("value"),
   formula: text("formula").default(''),
   row: integer("row").notNull(),
   column: varchar("column", { length: 10 }).notNull(),
-  style: jsonb("style").default({}), 
+  style: jsonb("style").default({}),
   createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    // Add a unique constraint on column and row combination
+    uniqueColumnRow: unique().on(table.column, table.row)
+  };
 });
 

@@ -51,6 +51,7 @@ export function Cells({
             const cellId = `${col}${row}`;
             const cell = activeSheet.getCell(cellId);
             const isActive = activeCell === cellId;
+            const style = getCellStyles(cell.style);
 
             return (
               <Cell
@@ -58,13 +59,20 @@ export function Cells({
                 cellId={cellId}
                 isActive={isActive}
                 isDragging={isDragging}
-                style={getCellStyles(cell.style)}
+                style={style}
                 onMouseEnter={() => handleMouseEnter(cellId)}
                 onClick={(e) => handleCellClick(cellId, e)}
                 onDoubleClick={() => {
                   setActiveCell(cellId);
                 }}
-              />
+              >
+                <div
+                  className="px-1 truncate h-full flex items-center"
+                  style={style}
+                >
+                  {cell.getValue()?.toString() ?? ''}
+                </div>
+              </Cell>
             );
           })}
         </div>

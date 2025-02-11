@@ -10,8 +10,13 @@ export class SheetController {
     return sheet.getCell(cellId);
   }
 
-  static setCell(sheet: Sheet, cellId: string, value: string): void {
-    sheet.setCell(cellId, value);
+  static setCell(sheet: Sheet, cellId: string, value: string | number | null): void {
+    const cell = sheet.getCell(cellId);
+    if (typeof value === 'string' && value.startsWith('=')) {
+      cell.setFormula(value);
+    } else {
+      cell.setValue(value);
+    }
   }
 
   static getAllCells(sheet: Sheet): Map<string, Cell> {

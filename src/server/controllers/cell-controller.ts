@@ -6,8 +6,8 @@ export class CellController {
     return new Cell();
   }
 
-  static updateCellValue(cell: Cell, value: string): void {
-    if (value.startsWith('=')) {
+  static updateCellValue(cell: Cell, value: string | number | null): void {
+    if (typeof value === 'string' && value.startsWith('=')) {
       cell.setFormula(value);
     } else {
       cell.setValue(value);
@@ -18,9 +18,9 @@ export class CellController {
     cell.style = { ...cell.style, ...style };
   }
 
-  static evaluateCell(cell: Cell, sheet: Sheet): string {
-    return cell.evaluate(sheet);
-  }
+  // static evaluateCell(cell: Cell, sheet: Sheet): string {
+  //   return cell.evaluate(sheet);
+  // }
 
   static cloneCell(cell: Cell): Cell {
     return cell.clone();

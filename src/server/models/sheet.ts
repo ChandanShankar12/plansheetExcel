@@ -24,9 +24,9 @@ export class Sheet {
     return this.cells.get(cellId)!;
   }
 
-  setCell(cellId: string, value: string): void {
+  setCell(cellId: string, value: string | number | null): void {
     const cell = this.getCell(cellId);
-    if (value.startsWith('=')) {
+    if (typeof value === 'string' && value.startsWith('=')) {
       cell.setFormula(value);
     } else {
       cell.setValue(value);
