@@ -1,10 +1,7 @@
 import { redis } from '@/server/db/cache/redis_client';
 import { Application } from '@/server/models/application';
 
-
 export class FileHandler {
-
-
   static async createDTSTFormat(app: Application) {
     // ... existing createDTSTFormat code ...
   }
@@ -15,25 +12,21 @@ export class FileHandler {
       if (!workbook) throw new Error('No active workbook');
 
       const spreadsheet = workbook.getSpreadsheet();
-      const sheetsData: Record<string, any> = {};
+      
 
       // Process each sheet
       for (const sheet of spreadsheet.sheets) {
         try {
           // Initialize sheet data structure
-          sheetsData[sheet.id] = {
-            id: sheet.id.toString(),
-            name: sheet.name,
-            cells: {}
-          };
+         
 
           // Get all cells for this sheet from Redis
           const cellKeys = await redis.keys(`cell:${sheet.id}:*`);
-          
+
           if (cellKeys.length > 0) {
             // Fetch all cell data at once
             const cellDataArray = await Promise.all(
-              cellKeys.map(key => redis.get(key))
+              cellKeys.map((key) => redis.get(key))
             );
 
             // Process each cell's data
@@ -42,7 +35,7 @@ export class FileHandler {
                 try {
                   const cellData = JSON.parse(data);
                   const cellId = `${cellData.column}${cellData.row}`;
-                  
+
                   // Add cell to sheet with proper structure
                   sheetsData[sheet.id].cells[cellId] = {
                     id: cellData.id,
@@ -50,15 +43,17 @@ export class FileHandler {
                     formula: cellData.formula || '',
                     row: cellData.row,
                     column: cellData.column,
-                    style: cellData.style || {}
+                    style: cellData.style || {},
                   };
                 } catch (parseError) {
-                  console.error(`Error parsing cell data for key ${cellKeys[index]}:`, parseError);
+                  console.error(
+                    `Error parsing cell data for key ${cellKeys[index]}:`,
+                    parseError
+                  );
                 }
               }
             });
           }
-
         } catch (error) {
           console.error(`Error processing sheet ${sheet.id}:`, error);
           throw error;
@@ -68,45 +63,45 @@ export class FileHandler {
       // Create DTST format with proper structure
       const dtstData = {
         header: {
-          formatVersion: "1.0",
-          fileType: "COHO_SPREADSHEET",
+          formatVersion: '1.0',
+          fileType: 'COHO_SPREADSHEET',
           createdAt: workbook.getCreatedAt().toISOString(),
           lastModified: new Date().toISOString(),
-          author: "User123"
+          author: 'User123',
         },
         body: {
           application: {
             id: app.id,
             activeWorkbookId: workbook.id,
             workbooks: {
-              [workbook.id]: {
-                id: workbook.id,
-                theme: workbook.getTheme(),
-                language: workbook.getConfig().language,
-                timezone: workbook.getConfig().timezone,
-                autoSave: workbook.isAutoSaveEnabled(),
-                lastModified: workbook.getLastModified().toISOString(),
-                spreadsheet: {
-                  id: spreadsheet.id || crypto.randomUUID(),
-                  activeSheetId: spreadsheet.activeSheetId,
-                  sheets: sheetsData
-                }
-              }
-            }
-          }
-        }
-      };
+              id: workbook.id,
+              theme: workbook.getTheme(),
+              language: workbook.getConfig().language,
+              timezone: workbook.getConfig().timezone,
+              autoSave: workbook.isAutoSaveEnabled(),
+              lastModified: workbook.getLastModified().toISOString(),
+              spreadsheet: {
+                activeSheetId: spreadsheet.activeSheetId,
+                sheets: workbook.getSpreadsheet().sheets.map((sheet) => {
+                  return {
+                    id: sheet.id,
+                    name: sheet.name,
+                    cells: sheet.cells,
+                  };
+                }),
+              },
+            },
+          },
+        },
+      }
 
-     
-
-      return dtstData;
+      return dtstData as any;
 
     } catch (error) {
       console.error('Error in FileHandler.saveWorkbook:', error);
       throw error;
     }
   }
-
 
   static async loadWorkbook(content: string) {
     try {
@@ -128,4 +123,4 @@ export class FileHandler {
       throw error;
     }
   }
-} 
+}

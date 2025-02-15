@@ -12,10 +12,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    console.log(body.application);
 
     const app = Application.fromJSON(body.application);
+    console.log(app);
+    console.log(`-----------------`)
+    console.log(app.getActiveWorkbook());
+    console.log(`-----------------`)
+    console.log(app.getActiveWorkbook().getSpreadsheet());
+    console.log(`-----------------`)
+    const sheet = app.getActiveWorkbook().getSpreadsheet().getSheet('Sheet 1');
+    console.log(sheet);
+    console.log(`-----------------`)
+    console.log(sheet.getCell('A1').getValue());
+
     
-    // Get formatted data with cells from cache
+        // Get formatted data with cells from cache
     try {
       const dtstData = await ApplicationController.saveWorkbook(app);
       

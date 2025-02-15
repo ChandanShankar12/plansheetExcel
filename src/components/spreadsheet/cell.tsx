@@ -44,10 +44,10 @@ export function Cell({
   };
 
   // Handle cell value changes
-  const handleValueChange = async (value: string | number | null) => {
+  const handleValueChange = async () => {
     try {
       // Update local state
-      CellController.updateCellValue(cell, value);
+      CellController.updateCellValue(cell, editValue);
       updateCell(cellId, cell);
       console.log('Cell updated successfully:', cell);
 

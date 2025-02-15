@@ -8,6 +8,7 @@ import { Spreadsheet } from '@/server/models/spreadsheet';
 import { Application } from '@/server/models/application';
 import { SpreadsheetController } from '@/server/controllers/spreadsheet-controller';
 import axios from 'axios';
+import { SheetController } from '@/server/controllers/sheet-controller';
 
 
 interface HistoryState {
@@ -99,9 +100,9 @@ export function SpreadsheetProvider({
 
   const updateCell = async (cellId: string, cell: Cell) => {
     try {
-      // // Update cell in active sheet
-      // activeSheet.setCell(cellId, cell);
-      
+      // Update cell in active sheet
+      SheetController.setCell(activeSheet, cellId, activeCell);
+      console.log('Cell updated successfully:', cell);
       // Update sheet data with the active sheet
       setSheetData(prev => new Map(prev).set(activeSheet.id, activeSheet));
 

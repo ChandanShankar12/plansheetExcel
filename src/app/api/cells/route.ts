@@ -54,10 +54,10 @@ export async function POST(request: Request) {
     }
 
     // Debug output
-    console.log('Saved cell data:', {
-      key: redisKey,
-      data: cellData
-    });
+    // console.log('Saved cell data:', {
+    //   key: redisKey,
+    //   data: cellData
+    // });
     
     return NextResponse.json({ 
       success: true,
