@@ -1,81 +1,118 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
+import axios from 'axios';
 import { useState } from 'react';
-import Image from 'next/image';
-import { Button } from './button';
-import { CellMetadata } from '@/lib/db/schema';
 
 export function SaveButton() {
-  const { data, spreadsheetId } = useSpreadsheetContext();
-  const [saving, setSaving] = useState(false);
+  const { application } = useSpreadsheetContext();
+  const [isSaving, setIsSaving] = useState(false);
 
+  console.log(application);
   const handleSave = async () => {
-    setSaving(true);
+    if (isSaving) return;
+    
+    setIsSaving(true);
     try {
-      // Convert cell data to match our schema format
-      const cellsToSave = Object.entries(data).map(([cellId, cellData]) => {
-        // Convert A1 notation to row/column index
-        const colStr = cellId.match(/[A-Z]+/)?.[0] || 'A';
-        const rowIndex = parseInt(cellId.match(/\d+/)?.[0] || '1');
-        
-        // Convert column letters to index (A=1, B=2, etc)
-        const columnIndex = colStr.split('').reduce((acc, char) => 
-          acc * 26 + char.charCodeAt(0) - 64, 0
-        );
-
-        const metadata: CellMetadata = {
-          style: cellData.style || {},
-          formula: cellData.value?.startsWith('=') ? cellData.value : undefined,
-        };
-
-        return {
-          userId: 'default-user', // Replace with actual user ID from auth
-          sheetId: spreadsheetId.toString(),
-          rowIndex,
-          columnIndex,
-          value: cellData.value || '',
-          metadata,
-          mergedWith: null
-        };
-      });
-
-      const response = await fetch('/api/save', {
-        method: 'POST',
+      // First attempt to save to database and get file data
+      const response = await axios.post('/api/save', { application }, { 
+        responseType: 'blob',
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(cellsToSave)
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save data');
+      // Check if response is valid
+      if (!response.data) {
+        throw new Error('No data received from server');
       }
 
-      console.log('Data saved successfully');
+      // Create file name with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = `workbook-${timestamp}.dtst`;
+
+      try {
+        // Try modern File System Access API first
+        if ('showSaveFilePicker' in window) {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'DTST Spreadsheet',
+              accept: {
+                'application/json': ['.dtst']
+              }
+            }],
+            excludeAcceptAllOption: false
+          });
+          
+          const writable = await handle.createWritable();
+          await writable.write(response.data);
+          await writable.close();
+          
+          console.log('File saved successfully using File System Access API');
+        } else {
+          // Fallback for browsers that don't support File System Access API
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          
+          // Create a dialog to inform user about fallback behavior
+          const userChoice = window.confirm(
+            'Your browser does not support choosing save location. ' +
+            'The file will be saved to your default downloads folder. Continue?'
+          );
+          
+          if (userChoice) {
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          }
+          
+          window.URL.revokeObjectURL(url);
+        }
+      } catch (fsError) {
+        if (fsError instanceof Error && fsError.name === 'AbortError') {
+          // User cancelled the save operation
+          console.log('Save operation cancelled by user');
+          return;
+        }
+        
+        // Handle other errors with fallback download
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
     } catch (error) {
-      console.error('Failed to save:', error);
+      console.error('Error saving file:', error);
+      let errorMessage = 'Failed to save file. Please try again.';
+      
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.error || errorMessage;
+      }
+      
+      alert(errorMessage);
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <Button
+    <button
       onClick={handleSave}
-      disabled={saving}
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6"
-      title="Save (Ctrl+S)"
+      disabled={isSaving}
+      className={`flex items-center gap-2 px-3 py-1 text-sm rounded
+        ${isSaving 
+          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+          : 'hover:bg-gray-100'
+        }`}
     >
-      <Image
-        src="/Icons/fluent_save-16-regular.svg"
-        alt="Save"
-        width={16}
-        height={16}
-        className={saving ? 'opacity-50' : ''}
-      />
-    </Button>
+      {isSaving ? 'Saving...' : 'Save'}
+    </button>
   );
 } 

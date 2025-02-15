@@ -2,8 +2,8 @@ import { Workbook } from '../models/workbook';
 import { Spreadsheet } from '../models/spreadsheet';
 
 export class WorkbookController {
-  static createWorkbook(userId: string): Workbook {
-    return new Workbook(userId);
+  static createWorkbook(): Workbook {
+    return new Workbook();
   }
 
   static getSpreadsheet(workbook: Workbook): Spreadsheet {
@@ -18,9 +18,9 @@ export class WorkbookController {
     workbook.updateConfig(updates);
   }
 
-  static getUserId(workbook: Workbook): string {
-    return workbook.getUserId();
-  }
+  // static getUserId(workbook: Workbook): string {
+  //   return workbook.getUserId();
+  // }
 
   static getTheme(workbook: Workbook): 'light' | 'dark' {
     return workbook.getTheme();

@@ -1,36 +1,49 @@
 import { NextResponse } from 'next/server';
-import { saveWorkbookData } from '@/lib/db/services/cell-service';
-import type { NewSheet } from '@/lib/db/schema';
+import { Application } from '@/server/models/application';
+import { ApplicationController } from '@/server/controllers/application-controller';
 
 export async function POST(request: Request) {
   try {
-    const cells: NewSheet[] = await request.json();
-    
-    if (!cells || !Array.isArray(cells) || cells.length === 0) {
+    // Validate request body
+    const body = await request.json();
+    if (!body.application) {
       return NextResponse.json(
-        { error: 'Invalid data format' },
+        { error: 'Missing application data' },
         { status: 400 }
       );
     }
 
-    console.log('Received save request:', {
-      cellCount: cells.length,
-      sheetId: cells[0].sheetId,
-      userId: cells[0].userId
-    });
+    const app = Application.fromJSON(body.application);
+    
+    // Get formatted data with cells from cache
+    try {
+      const dtstData = await ApplicationController.saveWorkbook(app);
+      
+      // Create file content
+      const content = JSON.stringify(dtstData, null, 2);
+      const blob = new Blob([content], { 
+        type: 'application/json'
+      });
 
-    const result = await saveWorkbookData(cells);
-    
-    if (!result) {
-      throw new Error('Failed to save workbook');
+      return new NextResponse(blob, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': 'attachment; filename="workbook.dtst"',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    } catch (error) {
+      console.error('Error creating file:', error);
+      return NextResponse.json(
+        { error: 'Failed to create file' },
+        { status: 500 }
+      );
     }
-    
-    console.log('Successfully saved workbook');
-    return NextResponse.json({ success: true });
+
   } catch (error) {
-    console.error('Failed to save workbook:', error);
+    console.error('Error in save route:', error);
     return NextResponse.json(
-      { error: 'Failed to save workbook' }, 
+      { error: 'Failed to process save request' },
       { status: 500 }
     );
   }

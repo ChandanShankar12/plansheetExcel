@@ -1,32 +1,43 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-
-interface Sheet {
-  id: number;
-  name: string;
-}
+import { Sheet } from '@/server/models/sheet';
 
 export function SheetsBar() {
-  const { activeSheet, sheets, addSheet } = useSpreadsheetContext();
+  const { 
+    activeSheet, 
+    sheets, 
+    addSheet, 
+    setActiveSheet,
+    spreadsheet 
+  } = useSpreadsheetContext();
+  
   const [editingSheet, setEditingSheet] = useState<number | null>(null);
   const [newSheetName, setNewSheetName] = useState('');
 
   useEffect(() => {
     if (sheets.length === 0) {
-      addSheet('Sheet1');
+      addSheet('Sheet 1');
     }
   }, [sheets.length, addSheet]);
 
   const handleAddSheet = () => {
-    const newSheetName = `Sheet${sheets.length + 1}`;
-    addSheet(newSheetName);
+    const sheetNumber = sheets.length + 1;
+    const baseName = 'Sheet ';
+    let newName = `${baseName}${sheetNumber}`;
+    
+    while (sheets.some(sheet => sheet.name === newName)) {
+      newName = `${baseName}${sheetNumber + 1}`;
+    }
+
+    const newSheet = addSheet(newName);
+    setActiveSheet(newSheet);
   };
 
-  const handleSheetClick = (sheetId: number) => {
-    setActiveSheet(sheetId);
+  const handleSheetClick = (sheet: Sheet) => {
+    setActiveSheet(sheet);
   };
 
   const handleDoubleClick = (sheet: Sheet) => {
@@ -36,7 +47,12 @@ export function SheetsBar() {
 
   const handleNameChange = (e: React.KeyboardEvent<HTMLInputElement>, sheet: Sheet) => {
     if (e.key === 'Enter') {
-      // Update sheet name logic here
+      const newName = newSheetName.trim();
+      if (newName && newName !== sheet.name) {
+        sheet.name = newName;
+        setEditingSheet(null);
+      }
+    } else if (e.key === 'Escape') {
       setEditingSheet(null);
     }
   };
@@ -47,7 +63,7 @@ export function SheetsBar() {
         {sheets.map((sheet) => (
           <div
             key={sheet.id}
-            onClick={() => handleSheetClick(sheet.id)}
+            onClick={() => handleSheetClick(sheet)}
             onDoubleClick={() => handleDoubleClick(sheet)}
             className={`
               flex items-center px-3 py-1 min-w-[100px] max-w-[200px]

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
 import { CellStyle } from '@/lib/types';
 import { Cell } from './cell';
 

@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
 import { redis } from '@/server/db/cache/redis_client';
 import { CellStyle } from '@/lib/types';
-import { Cell } from '@/server/models/cell';
-import { Sheet } from '@/server/models/sheet';
-import { db } from '@/server/db/db';
-import { cells } from '@/server/db/schema';
-import { and, eq } from 'drizzle-orm';
-import { CellController } from '@/server/controllers/cell-controller';
 
 interface CellRequest {
-  sheetId: string;
+  sheetName: string;
   cellId: string;
-  value: string | null;
+  value: any | null;
   formula?: string;
   style?: CellStyle;
 }
@@ -19,49 +13,56 @@ interface CellRequest {
 export async function POST(request: Request) {
   try {
     const body: CellRequest = await request.json();
-    const { sheetId, cellId, value, formula, style } = body;
+    const { sheetName, cellId, value, formula, style } = body;
 
-    if (!sheetId || !cellId) {
+    if (!sheetName || !cellId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Parse cellId
-    const colLetter = cellId.match(/[A-Z]+/)?.[0];
-    const rowIndex = parseInt(cellId.match(/\d+/)?.[0] || '0');
+    // Parse cell coordinates
+    const matches = cellId.match(/([A-Z]+)(\d+)/);
+    if (!matches) {
+      return NextResponse.json(
+        { error: 'Invalid cell ID format' },
+        { status: 400 }
+      );
+    }
+
+    const [_, colLetter, rowIndex] = matches;
     
-    // Create cell data
+    // Create cell data in the correct format
     const cellData = {
-      id: crypto.randomUUID(),
+      id: cellId,
       value: value,
       formula: formula || '',
-      row: rowIndex,
+      row: parseInt(rowIndex),
       column: colLetter,
       style: style || {},
     };
 
-    const redisKey = `cell:${sheetId}:${cellId}`;
+    // Save to Redis with the correct key format
+    const redisKey = `cell:${sheetName}:${cellId}`;
     await redis.set(redisKey, JSON.stringify(cellData));
 
-    // Schedule database update after 2 seconds
-    setTimeout(async () => {
-      try {
-        await db
-          .insert(cells)
-          .values(cellData);
-      } catch (error) {
-        console.error('Failed to persist cell to database:', error);
-        await redis.set(`${redisKey}:error`, 'failed_to_persist');
-      }
-    }, 2000);
+    // Verify data was saved
+    const savedData = await redis.get(redisKey);
+    if (!savedData) {
+      throw new Error('Failed to verify saved data');
+    }
 
-    return NextResponse.json({
-      success: true,
+    // Debug output
+    console.log('Saved cell data:', {
+      key: redisKey,
       data: cellData
     });
-
+    
+    return NextResponse.json({ 
+      success: true,
+      data: cellData 
+    });
   } catch (error) {
     console.error('Failed to update cell:', error);
     return NextResponse.json(
@@ -84,35 +85,16 @@ export async function GET(request: Request) {
       );
     }
 
-    // Try to get from Redis first
+    // Try to get from Redis
     const redisKey = `cell:${sheetId}:${cellId}`;
     const cachedData = await redis.get(redisKey);
     
     if (cachedData) {
+      const data = JSON.parse(cachedData);
       return NextResponse.json({
         success: true,
-        data: JSON.parse(cachedData),
+        data: data,
         source: 'cache'
-      });
-    }
-
-    // If not in cache, get from database
-    const dbCell = await db.select()
-      .from(cells)
-      .where(
-        eq(cells.column, cellId.match(/[A-Z]+/)?.[0] || '')
-      )
-      .limit(1);
-
-    if (dbCell.length > 0) {
-      const cellData = dbCell[0];
-      // Store in cache for future requests
-      await redis.set(redisKey, JSON.stringify(cellData));
-      
-      return NextResponse.json({
-        success: true,
-        data: cellData,
-        source: 'database'
       });
     }
 
@@ -124,7 +106,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Failed to fetch cell:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch cell' },
+      { error: 'Failed to fetch cell data' },
       { status: 500 }
     );
   }

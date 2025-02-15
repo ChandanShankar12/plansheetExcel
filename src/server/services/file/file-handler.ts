@@ -1,58 +1,131 @@
-import { Workbook } from '@/server/models/workbook';
+import { redis } from '@/server/db/cache/redis_client';
 import { Application } from '@/server/models/application';
 
+
 export class FileHandler {
-  static async saveWorkbook(workbook: Workbook): Promise<Blob> {
-    const workbookData = workbook.toJSON();
-    const content = JSON.stringify(workbookData, null, 2);
-    return new Blob([content], { type: 'application/json' });
+
+
+  static async createDTSTFormat(app: Application) {
+    // ... existing createDTSTFormat code ...
   }
 
-  static async loadWorkbook(content: string): Promise<Workbook> {
+  static async saveWorkbook(app: Application) {
+    try {
+      const workbook = app.getActiveWorkbook();
+      if (!workbook) throw new Error('No active workbook');
+
+      const spreadsheet = workbook.getSpreadsheet();
+      const sheetsData: Record<string, any> = {};
+
+      // Process each sheet
+      for (const sheet of spreadsheet.sheets) {
+        try {
+          // Initialize sheet data structure
+          sheetsData[sheet.id] = {
+            id: sheet.id.toString(),
+            name: sheet.name,
+            cells: {}
+          };
+
+          // Get all cells for this sheet from Redis
+          const cellKeys = await redis.keys(`cell:${sheet.id}:*`);
+          
+          if (cellKeys.length > 0) {
+            // Fetch all cell data at once
+            const cellDataArray = await Promise.all(
+              cellKeys.map(key => redis.get(key))
+            );
+
+            // Process each cell's data
+            cellDataArray.forEach((data, index) => {
+              if (data) {
+                try {
+                  const cellData = JSON.parse(data);
+                  const cellId = `${cellData.column}${cellData.row}`;
+                  
+                  // Add cell to sheet with proper structure
+                  sheetsData[sheet.id].cells[cellId] = {
+                    id: cellData.id,
+                    value: cellData.value,
+                    formula: cellData.formula || '',
+                    row: cellData.row,
+                    column: cellData.column,
+                    style: cellData.style || {}
+                  };
+                } catch (parseError) {
+                  console.error(`Error parsing cell data for key ${cellKeys[index]}:`, parseError);
+                }
+              }
+            });
+          }
+
+        } catch (error) {
+          console.error(`Error processing sheet ${sheet.id}:`, error);
+          throw error;
+        }
+      }
+
+      // Create DTST format with proper structure
+      const dtstData = {
+        header: {
+          formatVersion: "1.0",
+          fileType: "COHO_SPREADSHEET",
+          createdAt: workbook.getCreatedAt().toISOString(),
+          lastModified: new Date().toISOString(),
+          author: "User123"
+        },
+        body: {
+          application: {
+            id: app.id,
+            activeWorkbookId: workbook.id,
+            workbooks: {
+              [workbook.id]: {
+                id: workbook.id,
+                theme: workbook.getTheme(),
+                language: workbook.getConfig().language,
+                timezone: workbook.getConfig().timezone,
+                autoSave: workbook.isAutoSaveEnabled(),
+                lastModified: workbook.getLastModified().toISOString(),
+                spreadsheet: {
+                  id: spreadsheet.id || crypto.randomUUID(),
+                  activeSheetId: spreadsheet.activeSheetId,
+                  sheets: sheetsData
+                }
+              }
+            }
+          }
+        }
+      };
+
+     
+
+      return dtstData;
+
+    } catch (error) {
+      console.error('Error in FileHandler.saveWorkbook:', error);
+      throw error;
+    }
+  }
+
+
+  static async loadWorkbook(content: string) {
     try {
       const data = JSON.parse(content);
-      return Workbook.fromJSON(data);
+      return Application.fromJSON(data.body.application);
     } catch (error) {
-      console.error('Error parsing workbook file:', error);
-      throw new Error('Invalid workbook file format');
+      console.error('Error loading workbook:', error);
+      throw error;
     }
   }
 
-  static async saveToLocalStorage(key: string, data: any): Promise<void> {
+  static async loadFromCache(sheetId: string, cellId: string) {
     try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
-    }
-  }
-
-  static async loadFromLocalStorage(key: string): Promise<any> {
-    try {
-      const data = localStorage.getItem(key);
+      const key = `cell:${sheetId}:${cellId}`;
+      const data = await redis.get(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error loading from localStorage:', error);
-      return null;
-    }
-  }
-
-  static async updateRecentFiles(filename: string): Promise<void> {
-    try {
-      const recentFiles = await this.loadFromLocalStorage('recentFiles') || [];
-      const newFile = {
-        name: filename,
-        lastModified: new Date().toISOString(),
-      };
-      
-      // Add to beginning, remove duplicates, keep only last 10
-      const updatedFiles = [
-        newFile,
-        ...recentFiles.filter((f: any) => f.name !== filename)
-      ].slice(0, 10);
-      
-      await this.saveToLocalStorage('recentFiles', updatedFiles);
-    } catch (error) {
-      console.error('Error updating recent files:', error);
+      console.error('Error loading cell from cache:', error);
+      throw error;
     }
   }
 } 

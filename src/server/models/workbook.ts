@@ -2,7 +2,7 @@ import { Spreadsheet } from './spreadsheet';
 
 
 interface UserConfig {
-  userId: string;
+ 
   theme: 'light' | 'dark';
   language: string;
   timezone: string;
@@ -16,11 +16,11 @@ export class Workbook {
   private config: UserConfig;
   public id: string;
 
-  constructor(userId: string) {
+  constructor() {
     this.id = Math.random().toString(36).substring(7);
     this.spreadsheet = new Spreadsheet();
     this.config = {
-      userId,
+     
       theme: 'light',
       language: 'en',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -46,11 +46,6 @@ export class Workbook {
       ...updates,
       lastModified: new Date()
     };
-  }
-
-  // User methods
-  getUserId(): string {
-    return this.config.userId;
   }
 
   // Theme methods
@@ -92,7 +87,7 @@ export class Workbook {
   }
 
   static fromJSON(data: any): Workbook {
-    const workbook = new Workbook(data.config.userId);
+    const workbook = new Workbook();
     workbook.id = data.id;
     workbook.config = {
       ...data.config,

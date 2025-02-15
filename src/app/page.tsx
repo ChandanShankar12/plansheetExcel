@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SpreadsheetProvider } from '@/context/spreadsheet-context';
+import { SpreadsheetProvider } from '@/hooks/spreadsheet-context';
 import { Spreadsheet } from '@/components/spreadsheet';
 import { ProjectBar } from '@/components/spreadsheet/projectbar';
 import { Toolbar } from '@/components/spreadsheet/toolbar';
@@ -18,10 +18,10 @@ export default function Home() {
 
   return (
     <SpreadsheetProvider>
-      <SplashScreen 
+      {/* <SplashScreen 
         isOpen={showSplash} 
         onClose={() => setShowSplash(false)} 
-      />
+      /> */}
       <div className="flex flex-col h-full max-h-full">
         {/* Main Content + Aside */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -57,7 +57,7 @@ export default function Home() {
         </div>
 
         {/* Floating Modal */}
-        <FloatingModal isFloating={true} />
+        {/* <FloatingModal isFloating={true} /> */}
       </div>
     </SpreadsheetProvider>
   );

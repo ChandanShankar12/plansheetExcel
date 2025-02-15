@@ -3,7 +3,7 @@ import '@/styles/fonts.css';
 import localFont from 'next/font/local';
 import type { Metadata } from 'next';
 import { TitleBar } from '../components/TitleBar/TitleBar';
-import { SpreadsheetProvider } from '@/context/spreadsheet-context';
+import { SpreadsheetProvider } from '@/hooks/spreadsheet-context';
 
 
 const inter = localFont({

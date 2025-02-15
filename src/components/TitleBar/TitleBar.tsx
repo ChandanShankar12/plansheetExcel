@@ -4,7 +4,6 @@ import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
 import { SaveButton } from '../ui/SaveButton';
-
 import { Divider } from '../ui/divider';
 
 export const TitleBar = () => {

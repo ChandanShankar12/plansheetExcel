@@ -1,7 +1,7 @@
 'use client';
 
 // Import necessary dependencies
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
 import { useState, useRef, useEffect } from 'react';
 import { CellStyle } from '@/lib/types';
 import { Cells } from './cells';
@@ -155,7 +155,7 @@ export function Grid() {
         const selectedCells = selection
           ? getSelectedCellsData()
           : SheetController.getCell(activeSheet, activeCell).getValue();
-        navigator.clipboard.writeText(selectedCells);
+        navigator.clipboard.writeText(String(selectedCells));
       }
 
       // Cut (Ctrl/Cmd + X)
@@ -163,7 +163,7 @@ export function Grid() {
         const selectedCells = selection
           ? getSelectedCellsData()
           : SheetController.getCell(activeSheet, activeCell).getValue();
-        navigator.clipboard.writeText(selectedCells);
+        navigator.clipboard.writeText(String(selectedCells));
         if (selection) {
           clearSelectedCells();
         } else {

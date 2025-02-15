@@ -26,5 +26,5 @@ process.on('SIGTERM', async () => {
   await client.quit();
   process.exit(0);
 });
-
 export { client as redis };
+

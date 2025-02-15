@@ -1,7 +1,8 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
 import { CellController } from '@/server/controllers/cell-controller';
+import { FileHandler } from '@/server/services/file/file-handler';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 
@@ -44,38 +45,25 @@ export function Cell({
 
   // Handle cell value changes
   const handleValueChange = async (value: string | number | null) => {
-    CellController.updateCellValue(cell, value);
-    updateCell(cellId, cell);
-
-    // Send to API
     try {
-      const response = await axios.post('/api/cells', {
-        sheetId: activeSheet.id,
-        cellId,
-        value: value,
-        formula: cell.getFormula(),
-        style: cell.style
-      });
+      // Update local state
+      CellController.updateCellValue(cell, value);
+      updateCell(cellId, cell);
+      console.log('Cell updated successfully:', cell);
 
-      if (!response.data.success) {
-        console.error('Failed to save cell:', response.data);
-      }
+      // Save to Redis cache
+
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        console.error('Error saving cell:', error.response?.data || error.message);
-      } else {
-        console.error('Error saving cell:', error);
-      }
+      console.error('Error saving cell:', error);
     }
   };
 
-
-  // Stop editing and save cell value
   const stopEditing = () => {
-    if (isEditing) {
+    if (editValue !== null) {
       handleValueChange(editValue);
-      setIsEditing(false);
     }
+    setIsEditing(false);
+    setEditValue(null);
   };
 
   // Focus input when editing starts
