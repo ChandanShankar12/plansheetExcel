@@ -26,15 +26,20 @@ export class Sheet {
 
   setCell(cellId: string, value: string | number | null): void {
     const cell = this.getCell(cellId);
-    if (typeof value === 'string' && value.startsWith('=')) {
-      cell.setFormula(value);
-    } else {
-      cell.setValue(value);
-    }
+    cell.setValue(value);
   }
 
   getAllCells(): Map<string, Cell> {
     return this.cells;
+  }
+
+  clone(): Sheet {
+    const clonedSheet = new Sheet(this.name);
+    clonedSheet.id = this.id;
+    this.cells.forEach((cell, key) => {
+      clonedSheet.cells.set(key, cell.clone());
+    });
+    return clonedSheet;
   }
 
   toJSON() {

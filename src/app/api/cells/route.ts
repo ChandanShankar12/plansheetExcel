@@ -12,89 +12,47 @@ interface CellRequest {
 
 export async function POST(request: Request) {
   try {
-    const body: CellRequest = await request.json();
-    const { sheetName, cellId, value, formula, style } = body;
+    const { sheetName, cellId, value, formula, style } = await request.json();
 
     if (!sheetName || !cellId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Parse cell coordinates
-    const matches = cellId.match(/([A-Z]+)(\d+)/);
-    if (!matches) {
-      return NextResponse.json(
-        { error: 'Invalid cell ID format' },
-        { status: 400 }
-      );
-    }
-
-    const [_, colLetter, rowIndex] = matches;
-    
-    // Create cell data in the correct format
-    const cellData = {
-      id: cellId,
-      value: value,
-      formula: formula || '',
-      row: parseInt(rowIndex),
-      column: colLetter,
-      style: style || {},
-    };
-
-    // Save to Redis with the correct key format
-    const redisKey = `cell:${sheetName}:${cellId}`;
-    await redis.set(redisKey, JSON.stringify(cellData));
-
-    // Verify data was saved
-    const savedData = await redis.get(redisKey);
-    if (!savedData) {
-      throw new Error('Failed to verify saved data');
-    }
-
-    // Debug output
-    // console.log('Saved cell data:', {
-    //   key: redisKey,
-    //   data: cellData
-    // });
-    
-    return NextResponse.json({ 
-      success: true,
-      data: cellData 
-    });
-  } catch (error) {
-    console.error('Failed to update cell:', error);
-    return NextResponse.json(
-      { error: 'Failed to update cell' },
-      { status: 500 }
+    await redis.set(
+      `cell:${sheetName}:${cellId}`,
+      JSON.stringify({
+        id: cellId,
+        value,
+        formula: formula || '',
+        style: style || {}
+      })
     );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to update cell' }, { status: 500 });
   }
 }
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const sheetId = searchParams.get('sheetId');
+    const sheetName = searchParams.get('sheetName');
     const cellId = searchParams.get('cellId');
 
-    if (!sheetId || !cellId) {
+    if (!sheetName || !cellId) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
       );
     }
 
-    // Try to get from Redis
-    const redisKey = `cell:${sheetId}:${cellId}`;
-    const cachedData = await redis.get(redisKey);
+    const cachedData = await redis.get(`cell:${sheetName}:${cellId}`);
     
     if (cachedData) {
-      const data = JSON.parse(cachedData);
       return NextResponse.json({
         success: true,
-        data: data,
-        source: 'cache'
+        data: JSON.parse(cachedData)
       });
     }
 

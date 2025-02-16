@@ -1,10 +1,8 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
+import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { CellController } from '@/server/controllers/cell-controller';
-import { FileHandler } from '@/server/services/file/file-handler';
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 
 interface CellProps {
   cellId: string;
@@ -14,6 +12,7 @@ interface CellProps {
   onMouseEnter: () => void;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
+  children?: React.ReactNode;
 }
 
 export function Cell({
@@ -24,35 +23,27 @@ export function Cell({
   onMouseEnter,
   onClick,
   onDoubleClick,
+  children
 }: CellProps) {
-  const { 
-    activeSheet,
-    updateCell 
-  } = useSpreadsheetContext();
-
+  const { activeSheet, updateCell } = useSpreadsheetContext();
   const [editValue, setEditValue] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const cell = activeSheet.getCell(cellId);
 
-  // Start editing when double clicked
   const startEditing = () => {
     const currentValue = cell.getValue();
     setEditValue(currentValue);
     setIsEditing(true);
   };
 
-  // Handle cell value changes
   const handleValueChange = async () => {
     try {
-      // Update local state
-      CellController.updateCellValue(cell, editValue);
-      updateCell(cellId, cell);
-      console.log('Cell updated successfully:', cell);
-
-      // Save to Redis cache
-
+      if (editValue !== null) {
+        CellController.updateCellValue(cell, editValue);
+        await updateCell(cellId, cell);
+      }
     } catch (error) {
       console.error('Error saving cell:', error);
     }
@@ -60,20 +51,18 @@ export function Cell({
 
   const stopEditing = () => {
     if (editValue !== null) {
-      handleValueChange(editValue);
+      handleValueChange();
     }
     setIsEditing(false);
     setEditValue(null);
   };
 
-  // Focus input when editing starts
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isEditing]);
 
-  // Handle double click to start editing
   useEffect(() => {
     if (isActive && !isEditing) {
       const handleKeyPress = (e: KeyboardEvent) => {
@@ -106,15 +95,14 @@ export function Cell({
         <input
           ref={inputRef}
           value={editValue ?? ''}
-          onChange={(e) => {
-            setEditValue(e.target.value || null);
-          }}
+          onChange={(e) => setEditValue(e.target.value || null)}
           onBlur={stopEditing}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               stopEditing();
             } else if (e.key === 'Escape') {
               setIsEditing(false);
+              setEditValue(null);
             }
           }}
           className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
@@ -122,12 +110,7 @@ export function Cell({
           autoFocus
         />
       ) : (
-        <div
-          className="px-1 truncate h-full flex items-center"
-          style={style}
-        >
-          {cell.getValue() ?? ''}
-        </div>
+        children
       )}
     </div>
   );

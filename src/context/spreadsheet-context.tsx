@@ -7,9 +7,8 @@ import { Sheet } from '@/server/models/sheet';
 import { Spreadsheet } from '@/server/models/spreadsheet';
 import { Application } from '@/server/models/application';
 import { SpreadsheetController } from '@/server/controllers/spreadsheet-controller';
+import { CellController } from '@/server/controllers/cell-controller';
 import axios from 'axios';
-import { SheetController } from '@/server/controllers/sheet-controller';
-
 
 interface HistoryState {
   sheet: Sheet;
@@ -25,7 +24,7 @@ interface SpreadsheetContextType {
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
-  canRedo: boolean; 
+  canRedo: boolean;
   spreadsheet: Spreadsheet;
   sheets: Sheet[];
   addSheet: (name: string) => Sheet;
@@ -46,15 +45,12 @@ export function SpreadsheetProvider({
 }: {
   children: React.ReactNode;
 }) {
-  // Initialize Application and Spreadsheet
-  const [application] = useState(() => {
-    const app = new Application();
-    return app;
-  });
-
+  // Initialize Application and get active workbook's spreadsheet
+  const [application] = useState(() => new Application());
   const [spreadsheet] = useState(() => {
-    const wb = application.createWorkbook();
-    return wb.getSpreadsheet();
+    const workbook = application.getActiveWorkbook();
+    if (!workbook) throw new Error('No active workbook');
+    return workbook.getSpreadsheet();
   });
 
   const [activeCell, setActiveCell] = useState<string | null>(null);
@@ -62,27 +58,20 @@ export function SpreadsheetProvider({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
 
-  // Initialize first sheet
-  useEffect(() => {
-    if (!spreadsheet.getSheet('Sheet 1')) {
-      SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
-    }
-  }, [spreadsheet]);
-
+  // Initialize first sheet if needed
   const [activeSheet, setActiveSheetState] = useState<Sheet>(() => {
     const firstSheet = spreadsheet.getSheet('Sheet 1');
     if (!firstSheet) {
-      const newSheet = new Sheet('Sheet 1');
-      SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
+      const newSheet = SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
       return newSheet;
     }
     return firstSheet;
   });
 
-  // Keep track of all sheet data
+  // Track sheet data
   const [sheetData, setSheetData] = useState<Map<number, Sheet>>(new Map());
 
-  // Save sheet data when switching sheets
+  // Update sheet data when active sheet changes
   useEffect(() => {
     if (activeSheet) {
       setSheetData(prev => new Map(prev).set(activeSheet.id, activeSheet));
@@ -100,43 +89,36 @@ export function SpreadsheetProvider({
 
   const updateCell = async (cellId: string, cell: Cell) => {
     try {
-      // Update cell in active sheet
-      SheetController.setCell(activeSheet, cellId, activeCell);
-      console.log('Cell updated successfully:', cell);
-      // Update sheet data with the active sheet
-      setSheetData(prev => new Map(prev).set(activeSheet.id, activeSheet));
+      // Only save if cell is dirty (has been modified)
+      if (cell.isDirtyCell()) {
+        const value = cell.getValue();
+        
+        // Only save non-empty values
+        if (value !== null && value !== '') {
+          const response = await axios.post('/api/cells', {
+            sheetName: activeSheet.name,
+            cellId,
+            value: value,
+            formula: cell.getFormula(),
+            style: cell.style
+          });
 
-      // Push current state to history
+          if (!response.data.success) {
+            throw new Error('Failed to save cell data');
+          }
+          
+          cell.clearDirtyFlag(); // Clear dirty flag after successful save
+        }
+      }
+
       pushToHistory({
         sheet: activeSheet,
         activeCell,
       });
 
-      // Save to Redis cache through API
-      const response = await axios.post('/api/cells', {
-        sheetName: activeSheet.name,
-        cellId,
-        value: cell.getValue(),
-        formula: cell.getFormula(),
-        style: cell.style
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.data.success) {
-        throw new Error('Failed to save cell data');
-      }
-
-      // Log success
-      console.log('Cell updated successfully:', response.data);
-
     } catch (error) {
       console.error('Failed to update cell:', error);
-      // Optionally revert the local update if the API call fails
-      setActiveSheetState(activeSheet);
-      setSheetData(prev => new Map(prev).set(activeSheet.id, activeSheet));
+      throw error;
     }
   };
 
@@ -158,40 +140,19 @@ export function SpreadsheetProvider({
     }
   };
 
-  const switchActiveSheet = (sheet: Sheet) => {
-    // Check if we have saved data for this sheet
-    const savedSheet = sheetData.get(sheet.id);
-    
-    if (savedSheet) {
-      // Use saved sheet data if available
-      setActiveSheetState(savedSheet);
-    } else {
-      // Create new sheet instance if no saved data
-      const newSheet = new Sheet(sheet.name);
-      newSheet.id = sheet.id;
-      
-      // Copy cells from the original sheet
-      sheet.getAllCells().forEach((cell, key) => {
-        newSheet.cells.set(key, cell.clone());
-      });
-      
-      setActiveSheetState(newSheet);
-      setSheetData(prev => new Map(prev).set(newSheet.id, newSheet));
-    }
-    
-    // Clear selection and active cell when switching sheets
-    setActiveCell(null);
-    setSelection(null);
-  };
-
   const addSheet = (name: string): Sheet => {
-    const newSheet = SpreadsheetController.addSheet(spreadsheet, name);
+    const newSheet = new Sheet(name);
+    spreadsheet.addSheet(newSheet);
     setActiveSheetState(newSheet);
     return newSheet;
   };
 
+  const setActiveSheet = (sheet: Sheet) => {
+    setActiveSheetState(sheet);
+  };
+
   const setApplication = (app: Application) => {
-    // Implementation of setApplication function
+    // Implementation when needed for file loading
   };
 
   return (
@@ -200,8 +161,12 @@ export function SpreadsheetProvider({
         activeCell,
         setActiveCell,
         activeSheet,
-        setActiveSheet: setActiveSheetState,
+        setActiveSheet,
         updateCell,
+        undo,
+        redo,
+        canUndo: currentIndex > 0,
+        canRedo: currentIndex < history.length - 1,
         spreadsheet,
         sheets: spreadsheet.sheets,
         addSheet,

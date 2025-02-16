@@ -1,6 +1,6 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
+import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { Sheet } from '@/server/models/sheet';

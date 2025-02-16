@@ -3,40 +3,36 @@ import { Sheet } from "./sheet";
 
 export class Cell {
   id: string;
-  private value: string | null = null;
+  private value: any = null;
   private formula: string = "";
-  sheet: Sheet;
-  row: number;
-  column: string;
-  style: {
-    fontFamily?: string;
-    fontSize?: number;
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-    textColor?: string;
-    backgroundColor?: string;
-    stroke?: string;
-    align?: 'left' | 'center' | 'right';
-  };
+  sheet?: Sheet;
+  row?: number;
+  column?: string;
+  style: CellStyle = {};
+  private isDirty: boolean = false; // Track if cell has been modified
 
   constructor() {
     this.id = crypto.randomUUID();
-    this.value = null;
-    this.formula = "";
-    this.style = {};
   }
 
-  getValue(): string | null {
-    if (this.formula) {
-      return this.evaluate(this.sheet);
+  getValue(): any {
+    return this.formula ? this.evaluate() : this.value;
+  }
+
+  setValue(value: any): void {
+    if (this.value !== value) {
+      this.value = value;
+      this.formula = "";
+      this.isDirty = true; // Mark as modified
     }
-    return this.value;
   }
 
-  setValue(value: string | number | null): void {
-    this.formula = "";
-    this.value = value === null ? null : String(value);
+  isDirtyCell(): boolean {
+    return this.isDirty;
+  }
+
+  clearDirtyFlag(): void {
+    this.isDirty = false;
   }
 
   getFormula(): string {
@@ -45,15 +41,14 @@ export class Cell {
 
   setFormula(formula: string): void {
     this.formula = formula;
-    this.value = this.evaluate(this.sheet);
+    this.value = this.evaluate();
   }
 
-  evaluate(sheet: Sheet): string | null {
+  private evaluate(): string | null {
     if (this.formula) {
       try {
         if (this.formula.startsWith('=')) {
-          const formulaContent = this.formula.substring(1);
-          return formulaContent;
+          return this.formula.substring(1);
         }
         return this.formula;
       } catch (error) {

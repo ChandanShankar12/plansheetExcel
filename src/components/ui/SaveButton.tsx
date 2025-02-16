@@ -1,6 +1,6 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
+import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import axios from 'axios';
 import { useState } from 'react';
 

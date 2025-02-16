@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SpreadsheetProvider } from '@/hooks/spreadsheet-context';
+import { SpreadsheetProvider } from '@/context/spreadsheet-context';
 import { Spreadsheet } from '@/components/spreadsheet';
 import { ProjectBar } from '@/components/spreadsheet/projectbar';
 import { Toolbar } from '@/components/spreadsheet/toolbar';

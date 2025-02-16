@@ -1,7 +1,7 @@
 'use client';
 
 // Import necessary dependencies
-import { useSpreadsheetContext } from '@/hooks/spreadsheet-context';
+import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { useState, useRef, useEffect } from 'react';
 import { CellStyle } from '@/lib/types';
 import { Cells } from './cells';

@@ -3,7 +3,17 @@ import { Cell } from '../models/cell';
 
 export class SheetController {
   static createSheet(name: string): Sheet {
-    return new Sheet(name);
+    const sheet = new Sheet(name);
+    
+    // Initialize all cells in the sheet
+    for (let row = 1; row <= 100; row++) {
+      for (let col = 'A'.charCodeAt(0); col <= 'Z'.charCodeAt(0); col++) {
+        const cellId = `${String.fromCharCode(col)}${row}`;
+        sheet.setCell(cellId, new Cell(cellId));
+      }
+    }
+    
+    return sheet;
   }
 
   static getCell(sheet: Sheet, cellId: string): Cell {

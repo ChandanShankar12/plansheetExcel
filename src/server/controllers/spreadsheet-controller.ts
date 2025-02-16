@@ -1,5 +1,6 @@
 import { Spreadsheet } from '../models/spreadsheet';
 import { Sheet } from '../models/sheet';
+import { SheetController } from './sheet-controller';
 
 export class SpreadsheetController {
   static createSpreadsheet(): Spreadsheet {
@@ -7,7 +8,10 @@ export class SpreadsheetController {
   }
 
   static addSheet(spreadsheet: Spreadsheet, name: string): Sheet {
-    return spreadsheet.addSheet(name);
+    const sheet = new Sheet(name);
+    spreadsheet.sheets.push(sheet);
+    spreadsheet.setActiveSheet(sheet.id);
+    return sheet;
   }
 
   static getSheet(spreadsheet: Spreadsheet, name: string): Sheet | undefined {

@@ -12,68 +12,69 @@ export class FileHandler {
       if (!workbook) throw new Error('No active workbook');
 
       const spreadsheet = workbook.getSpreadsheet();
-      
+      const sheetsData: Record<string, any> = {};
 
       // Process each sheet
       for (const sheet of spreadsheet.sheets) {
+        sheetsData[sheet.id] = {
+          id: sheet.id,
+          name: sheet.name,
+          cells: {}
+        };
+
         try {
-          // Initialize sheet data structure
-         
-
           // Get all cells for this sheet from Redis
-          const cellKeys = await redis.keys(`cell:${sheet.id}:*`);
-
+          const cellKeys = await redis.keys(`cell:${sheet.name}:*`);
+          
           if (cellKeys.length > 0) {
-            // Fetch all cell data at once
             const cellDataArray = await Promise.all(
-              cellKeys.map((key) => redis.get(key))
+              cellKeys.map(key => redis.get(key))
             );
 
-            // Process each cell's data
-            cellDataArray.forEach((data, index) => {
+            cellDataArray.forEach((data) => {
               if (data) {
                 try {
                   const cellData = JSON.parse(data);
-                  const cellId = `${cellData.column}${cellData.row}`;
-
-                  // Add cell to sheet with proper structure
-                  sheetsData[sheet.id].cells[cellId] = {
-                    id: cellData.id,
-                    value: cellData.value,
-                    formula: cellData.formula || '',
-                    row: cellData.row,
-                    column: cellData.column,
-                    style: cellData.style || {},
-                  };
+                  sheetsData[sheet.id].cells[cellData.id] = cellData;
                 } catch (parseError) {
-                  console.error(
-                    `Error parsing cell data for key ${cellKeys[index]}:`,
-                    parseError
-                  );
+                  console.error('Error parsing cell data:', parseError);
                 }
               }
             });
           }
+
+          // Include dirty cells from memory
+          const sheetCells = sheet.getAllCells();
+          sheetCells.forEach((cell, cellId) => {
+            if (cell.isDirtyCell() && cell.getValue() !== null) {
+              sheetsData[sheet.id].cells[cellId] = {
+                id: cellId,
+                value: cell.getValue(),
+                formula: cell.getFormula(),
+                style: cell.style
+              };
+            }
+          });
+
         } catch (error) {
-          console.error(`Error processing sheet ${sheet.id}:`, error);
+          console.error(`Error processing sheet ${sheet.name}:`, error);
           throw error;
         }
       }
 
-      // Create DTST format with proper structure
-      const dtstData = {
+      return {
         header: {
           formatVersion: '1.0',
           fileType: 'COHO_SPREADSHEET',
           createdAt: workbook.getCreatedAt().toISOString(),
           lastModified: new Date().toISOString(),
-          author: 'User123',
+          author: 'User123'
         },
         body: {
           application: {
             id: app.id,
             activeWorkbookId: workbook.id,
-            workbooks: {
+            workbooks: [{
               id: workbook.id,
               theme: workbook.getTheme(),
               language: workbook.getConfig().language,
@@ -82,21 +83,12 @@ export class FileHandler {
               lastModified: workbook.getLastModified().toISOString(),
               spreadsheet: {
                 activeSheetId: spreadsheet.activeSheetId,
-                sheets: workbook.getSpreadsheet().sheets.map((sheet) => {
-                  return {
-                    id: sheet.id,
-                    name: sheet.name,
-                    cells: sheet.cells,
-                  };
-                }),
-              },
-            },
-          },
-        },
-      }
-
-      return dtstData as any;
-
+                sheets: Object.values(sheetsData)
+              }
+            }]
+          }
+        }
+      };
     } catch (error) {
       console.error('Error in FileHandler.saveWorkbook:', error);
       throw error;
@@ -106,7 +98,32 @@ export class FileHandler {
   static async loadWorkbook(content: string) {
     try {
       const data = JSON.parse(content);
-      return Application.fromJSON(data.body.application);
+      const app = Application.fromJSON(data.body.application);
+
+      // After loading the application, restore cell data to Redis
+      const workbook = app.getActiveWorkbook();
+      if (workbook) {
+        const spreadsheet = workbook.getSpreadsheet();
+        for (const sheet of spreadsheet.sheets) {
+          const cells = sheet.getAllCells();
+          for (const [cellId, cell] of cells) {
+            if (cell.getValue() !== null) {
+              const cellData = {
+                id: cellId,
+                value: cell.getValue(),
+                formula: cell.getFormula(),
+                style: cell.style
+              };
+              await redis.set(
+                `cell:${sheet.name}:${cellId}`,
+                JSON.stringify(cellData)
+              );
+            }
+          }
+        }
+      }
+
+      return app;
     } catch (error) {
       console.error('Error loading workbook:', error);
       throw error;

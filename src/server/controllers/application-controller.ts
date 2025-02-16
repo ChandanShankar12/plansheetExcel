@@ -1,5 +1,4 @@
 import { Application } from '../models/application';
-import { redis } from '../db/cache/redis_client';
 import { FileHandler } from '../services/file/file-handler';
 
 export class ApplicationController {
@@ -9,7 +8,7 @@ export class ApplicationController {
       if (!workbook) throw new Error('No active workbook');
 
       // Get the DTST formatted data from FileHandler
-      const dtstData = await FileHandler.saveWorkbook(app);
+      const dtstData = await FileHandler.saveWorkbook(app) as any;
       
       if (!dtstData) {
         throw new Error('Failed to create DTST format');

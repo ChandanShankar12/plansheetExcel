@@ -3,7 +3,7 @@ import { Sheet } from "./sheet";
 
 export class Spreadsheet {
   sheets: Sheet[] = [];
-  activeSheetId: number;
+  activeSheetId: number | null = null;
 
   constructor() {
     const initialSheet = new Sheet('Sheet 1');
@@ -11,10 +11,11 @@ export class Spreadsheet {
     this.activeSheetId = initialSheet.id;
   }
 
-  addSheet(name: string): Sheet {
-    const newSheet = new Sheet(name);
-    this.sheets.push(newSheet);
-    return newSheet;
+  addSheet(sheet: Sheet): void {
+    this.sheets.push(sheet);
+    if (!this.activeSheetId) {
+      this.activeSheetId = sheet.id;
+    }
   }
 
   getSheet(name: string): Sheet | undefined {
