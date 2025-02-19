@@ -2,9 +2,12 @@ import { Cell } from '@/server/models/cell';
 import { Sheet } from '@/server/models/sheet';
 
 export interface CellData {
-  value: string;
-  formula?: string;
-  style?: CellStyle;
+  id: string;
+  value: string | null;
+  formula: string;
+  style: CellStyle;
+  lastModified: string;
+  isModified: boolean;
   metadata?: Record<string, any>;
 }
 

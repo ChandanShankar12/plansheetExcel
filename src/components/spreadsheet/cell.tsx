@@ -1,8 +1,9 @@
 'use client';
 
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { CellController } from '@/server/controllers/cell-controller';
 import { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { CellData } from '@/lib/types';
 
 interface CellProps {
   cellId: string;
@@ -10,9 +11,8 @@ interface CellProps {
   isDragging: boolean;
   style: React.CSSProperties;
   onMouseEnter: () => void;
-  onClick: (e: React.MouseEvent) => void;
+  onClick: () => void;
   onDoubleClick: () => void;
-  children?: React.ReactNode;
 }
 
 export function Cell({
@@ -23,94 +23,97 @@ export function Cell({
   onMouseEnter,
   onClick,
   onDoubleClick,
-  children
 }: CellProps) {
   const { activeSheet, updateCell } = useSpreadsheetContext();
-  const [editValue, setEditValue] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState<string>('');
+  const [displayValue, setDisplayValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [cellData, setCellData] = useState<CellData | null>(null);
 
-  const cell = activeSheet.getCell(cellId);
+  // Remove the initial fetch effect - we only want to fetch when editing starts
+  const handleDoubleClick = async () => {
+    onDoubleClick();
+    
+    // Only fetch data if we haven't loaded it yet
+    if (!cellData && activeSheet) {
+      try {
+        const response = await axios.get<{ success: boolean; data: CellData | null }>('/api/cells/get', {
+          params: {
+            sheetId: activeSheet.id,
+            cellId,
+          }
+        });
 
-  const startEditing = () => {
-    const currentValue = cell.getValue();
-    setEditValue(currentValue);
+        if (response.data.success && response.data.data) {
+          setCellData(response.data.data);
+          const value = response.data.data.value?.toString() ?? '';
+          setDisplayValue(value);
+          setEditValue(value);
+        }
+      } catch (error) {
+        console.error('Failed to fetch cell data:', error);
+      }
+    } else {
+      setEditValue(displayValue);
+    }
+    
     setIsEditing(true);
   };
 
-  const handleValueChange = async () => {
+  const handleEdit = async () => {
+    if (!editValue.trim() || !activeSheet) {
+      setIsEditing(false);
+      return;
+    }
+
     try {
-      if (editValue !== null) {
-        CellController.updateCellValue(cell, editValue);
-        await updateCell(cellId, cell);
+      const result = await updateCell(cellId, editValue);
+      if (result && typeof result === 'object' && 'value' in result) {
+        const updatedCell = result as CellData;
+        setCellData(updatedCell);
+        setDisplayValue(updatedCell.value?.toString() ?? '');
       }
+      setIsEditing(false);
     } catch (error) {
-      console.error('Error saving cell:', error);
+      console.error('Failed to update cell:', error);
+      setIsEditing(false);
     }
   };
-
-  const stopEditing = () => {
-    if (editValue !== null) {
-      handleValueChange();
-    }
-    setIsEditing(false);
-    setEditValue(null);
-  };
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isEditing]);
-
-  useEffect(() => {
-    if (isActive && !isEditing) {
-      const handleKeyPress = (e: KeyboardEvent) => {
-        if (!isEditing && e.key.length === 1) {
-          startEditing();
-        }
-      };
-      window.addEventListener('keypress', handleKeyPress);
-      return () => window.removeEventListener('keypress', handleKeyPress);
-    }
-  }, [isActive, isEditing]);
 
   return (
     <div
       className={`
-        w-[80px] h-[20px] shrink-0 border-r border-b 
-        relative cursor-cell select-none
-        ${isActive ? 'ring-2 ring-[#166534] ring-inset' : ''}
-        hover:bg-gray-50
+        border-r border-b border-gray-300
+        ${isActive ? 'ring-2 ring-blue-500' : ''}
+        ${isEditing ? 'z-10' : ''}
       `}
       style={style}
-      onClick={onClick}
-      onDoubleClick={() => {
-        onDoubleClick();
-        startEditing();
-      }}
       onMouseEnter={onMouseEnter}
+      onClick={onClick}
+      onDoubleClick={handleDoubleClick}
     >
-      {isEditing && isActive ? (
+      {isEditing ? (
         <input
           ref={inputRef}
-          value={editValue ?? ''}
-          onChange={(e) => setEditValue(e.target.value || null)}
-          onBlur={stopEditing}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleEdit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              stopEditing();
+              handleEdit();
             } else if (e.key === 'Escape') {
               setIsEditing(false);
-              setEditValue(null);
+              setEditValue(displayValue);
             }
           }}
-          className="absolute inset-0 w-full h-full px-1 outline-none border-none bg-white"
-          style={style}
+          className="w-full h-full px-1 outline-none"
           autoFocus
         />
       ) : (
-        children
+        <div className="w-full h-full px-1 truncate flex items-center">
+          {displayValue}
+        </div>
       )}
     </div>
   );

@@ -3,68 +3,56 @@ import { redis } from '@/server/db/cache/redis_client';
 import { CellStyle } from '@/lib/types';
 
 interface CellRequest {
-  sheetName: string;
+  sheetId: string;
   cellId: string;
-  value: any | null;
+  value: string | null;
   formula?: string;
   style?: CellStyle;
 }
 
 export async function POST(request: Request) {
   try {
-    const { sheetName, cellId, value, formula, style } = await request.json();
+    const body: CellRequest = await request.json();
+    const { sheetId, cellId, value, formula, style } = body;
 
-    if (!sheetName || !cellId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    await redis.set(
-      `cell:${sheetName}:${cellId}`,
-      JSON.stringify({
-        id: cellId,
-        value,
-        formula: formula || '',
-        style: style || {}
-      })
-    );
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to update cell' }, { status: 500 });
-  }
-}
-
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const sheetName = searchParams.get('sheetName');
-    const cellId = searchParams.get('cellId');
-
-    if (!sheetName || !cellId) {
+    if (!sheetId || !cellId) {
       return NextResponse.json(
-        { error: 'Missing required parameters' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const cachedData = await redis.get(`cell:${sheetName}:${cellId}`);
-    
-    if (cachedData) {
+    const cellData = {
+      id: cellId,
+      value: value,
+      formula: formula || '',
+      style: style || {},
+      lastModified: new Date().toISOString(),
+      isModified: true
+    };
+
+    const redisKey = `cell:${sheetId}:${cellId}`;
+    try {
+      await redis.sadd(`sheet:${sheetId}:modified_cells`, cellId);
+      await redis.set(redisKey, JSON.stringify(cellData));
+      await redis.expire(redisKey, 24 * 60 * 60);
+
       return NextResponse.json({
         success: true,
-        data: JSON.parse(cachedData)
+        data: cellData
+      });
+    } catch (redisError) {
+      console.error('Redis operation failed:', redisError);
+      return NextResponse.json({
+        success: true,
+        data: cellData,
+        cached: false
       });
     }
-
-    return NextResponse.json({
-      success: false,
-      error: 'Cell not found'
-    }, { status: 404 });
-
   } catch (error) {
-    console.error('Failed to fetch cell:', error);
+    console.error('Failed to update cell:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch cell data' },
+      { error: 'Failed to update cell' },
       { status: 500 }
     );
   }

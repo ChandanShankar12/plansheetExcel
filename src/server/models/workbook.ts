@@ -1,8 +1,6 @@
 import { Spreadsheet } from './spreadsheet';
 
-
-interface UserConfig {
- 
+export interface UserConfig {
   theme: 'light' | 'dark';
   language: string;
   timezone: string;
@@ -14,13 +12,12 @@ interface UserConfig {
 export class Workbook {
   private spreadsheet: Spreadsheet;
   private config: UserConfig;
-  public id: string;
+  public readonly id: string;
 
-  constructor() {
-    this.id = Math.random().toString(36).substring(7);
-    this.spreadsheet = new Spreadsheet();
+  constructor(id?: string) {
+    this.id = id || Math.random().toString(36).substring(7);
+    this.spreadsheet = new Spreadsheet(this.id);
     this.config = {
-     
       theme: 'light',
       language: 'en',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -87,8 +84,7 @@ export class Workbook {
   }
 
   static fromJSON(data: any): Workbook {
-    const workbook = new Workbook();
-    workbook.id = data.id;
+    const workbook = new Workbook(data.id);
     workbook.config = {
       ...data.config,
       lastModified: new Date(data.config.lastModified),

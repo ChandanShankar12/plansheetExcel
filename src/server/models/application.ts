@@ -1,82 +1,91 @@
 import { Workbook } from './workbook';
 
 export class Application {
-  id: string;
-  private workbooks: Workbook[];
+  private workbooks: Map<string, Workbook>;
   private activeWorkbookId: string | null;
+  private static instance: Application;
 
-  constructor() {
-    this.id = crypto.randomUUID();
-    this.workbooks = [];
+  private constructor() {
+    this.workbooks = new Map();
     this.activeWorkbookId = null;
     
     // Create initial workbook
     this.createWorkbook();
   }
 
-  createWorkbook(): Workbook {
-    // Only create a new workbook if none exists
-    if (this.workbooks.length === 0) {
-      const workbook = new Workbook();
-      this.workbooks.push(workbook);
-      this.activeWorkbookId = workbook.id;
-      return workbook;
+  static getInstance(): Application {
+    if (!Application.instance) {
+      Application.instance = new Application();
     }
-    return this.workbooks[0];
+    return Application.instance;
+  }
+
+  createWorkbook(): Workbook {
+    const workbook = new Workbook();
+    this.workbooks.set(workbook.id, workbook);
+    if (!this.activeWorkbookId) {
+      this.activeWorkbookId = workbook.id;
+    }
+    return workbook;
   }
 
   getWorkbook(id: string): Workbook | undefined {
-    return this.workbooks.find(wb => wb.id === id);
+    return this.workbooks.get(id);
   }
 
   removeWorkbook(id: string): void {
-    // Prevent removing the last workbook
-    if (this.workbooks.length <= 1) {
-      return;
-    }
+    if (this.workbooks.size <= 1) return;
     
-    const index = this.workbooks.findIndex(wb => wb.id === id);
-    if (index !== -1) {
-      this.workbooks.splice(index, 1);
+    if (this.workbooks.has(id)) {
+      this.workbooks.delete(id);
       if (this.activeWorkbookId === id) {
-        this.activeWorkbookId = this.workbooks[0]?.id || null;
+        this.activeWorkbookId = this.workbooks.keys().next().value || null;
       }
     }
   }
 
   getAllWorkbooks(): Workbook[] {
-    return this.workbooks;
+    return Array.from(this.workbooks.values());
   }
 
   setActiveWorkbook(id: string): void {
-    const workbook = this.getWorkbook(id);
-    if (workbook) {
+    if (this.workbooks.has(id)) {
       this.activeWorkbookId = id;
     }
   }
 
   getActiveWorkbook(): Workbook | undefined {
-    return this.activeWorkbookId ? this.workbooks.find(wb => wb.id === this.activeWorkbookId) : this.workbooks[0];
+    if (this.activeWorkbookId) {
+      return this.workbooks.get(this.activeWorkbookId);
+    }
+    return this.workbooks.values().next().value;
   }
 
   toJSON() {
     return {
-      id: this.id,
-      workbooks: this.workbooks.map(wb => ({
-        id: wb.id,
-        workbook: wb.toJSON()
+      workbooks: Array.from(this.workbooks.entries()).map(([id, workbook]) => ({
+        id,
+        workbook: workbook.toJSON()
       })),
       activeWorkbookId: this.activeWorkbookId
     };
   }
 
-  static fromJSON(data: any): Application {
-    const app = new Application();
-    // Only take the first workbook from the data
-    if (data.workbooks && data.workbooks.length > 0) {
-      app.workbooks = [Workbook.fromJSON(data.workbooks[0].workbook)];
-      app.activeWorkbookId = app.workbooks[0].id;
+  static fromJSON(data: any): void {
+    const app = Application.getInstance();
+    app.workbooks.clear();
+    
+    if (data.workbooks) {
+      data.workbooks.forEach(({ id, workbook }: any) => {
+        const reconstructedWorkbook = Workbook.fromJSON(workbook);
+        app.workbooks.set(id, reconstructedWorkbook);
+      });
     }
-    return app;
+
+    if (data.activeWorkbookId && app.workbooks.has(data.activeWorkbookId)) {
+      app.activeWorkbookId = data.activeWorkbookId;
+    } else if (app.workbooks.size > 0) {
+      app.activeWorkbookId = app.workbooks.keys().next().value;
+    }
   }
 }

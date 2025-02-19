@@ -3,16 +3,14 @@
 // Import necessary dependencies
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
 import { useState, useRef, useEffect } from 'react';
-import { CellStyle } from '@/lib/types';
-import { Cells } from './cells';
-import { CellController } from '@/server/controllers/cell-controller';
-import { SheetController } from '@/server/controllers/sheet-controller';
+import { CellStyle, Selection } from '@/lib/types';
 
+import axios from 'axios';
+import { Cell } from './cell';
 
-// Interface for cell selection with start and end coordinates
-interface Selection {
-  start: string;
-  end: string;
+interface CellCoords {
+  col: string;
+  row: number;
 }
 
 // Interface for context menu state and position
@@ -22,6 +20,75 @@ interface ContextMenuState {
   type: 'row' | 'column' | null;
   index?: number | string;
 }
+
+// Helper function to get data from selected cells
+const getSelectedCellsData = async (
+  activeSheet: any,
+  selection: { start: string; end: string }
+) => {
+  if (!selection || !activeSheet) return '';
+
+  const startCoords = getCellCoords(selection.start);
+  const endCoords = getCellCoords(selection.end);
+
+  const minCol = Math.min(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+  const maxCol = Math.max(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+  const minRow = Math.min(startCoords.row, endCoords.row);
+  const maxRow = Math.max(startCoords.row, endCoords.row);
+
+  let data = '';
+  for (let row = minRow; row <= maxRow; row++) {
+    for (let col = minCol; col <= maxCol; col++) {
+      const cellId = `${String.fromCharCode(col)}${row}`;
+      const response = await axios.get('/api/cells', {
+        params: {
+          sheetId: activeSheet.id,
+          cellId
+        }
+      });
+      data += (response.data.success ? response.data.data.value : '') + '\t';
+    }
+    data = data.slice(0, -1) + '\n';
+  }
+  return data.trim();
+};
+
+// Parse cell ID into coordinates
+const getCellCoords = (cellId: string): CellCoords => {
+  const col = cellId.match(/[A-Z]+/)?.[0] || 'A';
+  const row = parseInt(cellId.match(/\d+/)?.[0] || '1');
+  return { col, row };
+};
+
+// Update the loadCell function
+const loadCell = async (cellId: string) => {
+  if (!activeSheet) return null;
+
+  try {
+    const response = await axios.get('/api/cells/get', {  // Changed from /api/cells to /api/cells/get
+      params: {
+        sheetId: activeSheet.id,
+        cellId,
+      }
+    });
+
+    if (response.data.success) {
+      const cellData = response.data.data;
+      if (cellData) {  // Only update if we got actual data
+        const cell = activeSheet.getCell(cellId);
+        if (cell) {
+          cell.setValue(cellData.value);
+          cell.setFormula(cellData.formula);
+          cell.style = cellData.style;
+        }
+        return cellData;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load cell:', error);
+  }
+  return null;
+};
 
 export function Grid() {
   // Get spreadsheet context values and functions
@@ -57,46 +124,10 @@ export function Grid() {
   const [isDragging, setIsDragging] = useState(false);
 
   // Generate column letters (A-Z) and row numbers (1-100)
-  const columns = Array.from({ length: 26 }, (_, i) =>
-    String.fromCharCode(65 + i)
+  const [columns] = useState(() =>
+    Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
   );
-  const rows = Array.from({ length: 100 }, (_, i) => i + 1);
-
-  // Helper function to convert cell ID (e.g. 'A1') to coordinates
-  const getCellCoords = (cellId: string) => {
-    const col = cellId.match(/[A-Z]+/)?.[0] || 'A';
-    const row = parseInt(cellId.match(/\d+/)?.[0] || '1');
-    return { col, row };
-  };
-
-  // Check if a cell is within the current selection range
-  const isCellSelected = (cellId: string) => {
-    if (!selection) return false;
-    const { col: startCol, row: startRow } = getCellCoords(selection.start);
-    const { col: endCol, row: endRow } = getCellCoords(selection.end);
-    const { col, row } = getCellCoords(cellId);
-
-    const minCol = String.fromCharCode(
-      Math.min(startCol.charCodeAt(0), endCol.charCodeAt(0))
-    );
-    const maxCol = String.fromCharCode(
-      Math.max(startCol.charCodeAt(0), endCol.charCodeAt(0))
-    );
-    const minRow = Math.min(startRow, endRow);
-    const maxRow = Math.max(startRow, endRow);
-
-    return col >= minCol && col <= maxCol && row >= minRow && row <= maxRow;
-  };
-
-  // Handle single cell click
-  const handleCellClick = (cellId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!isDragging) {
-      setActiveCell(cellId);
-      setSelection({ start: cellId, end: cellId });
-    }
-  };
+  const [rows] = useState(() => Array.from({ length: 100 }, (_, i) => i + 1));
 
   // Handle mouse down for starting cell selection
   const handleMouseDown = (cellId: string) => {
@@ -110,10 +141,7 @@ export function Grid() {
   // Handle mouse enter during drag selection
   const handleMouseEnter = (cellId: string) => {
     if (isDragging && selection) {
-      setSelection({ 
-        start: selection.start, 
-        end: cellId 
-      });
+      setSelection({ ...selection, end: cellId });
     }
   };
 
@@ -136,8 +164,8 @@ export function Grid() {
 
   // Handle keyboard shortcuts and navigation
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!activeCell || isDragging) return;
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (!activeCell || !activeSheet) return;
 
       // Save (Ctrl/Cmd + S)
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -152,38 +180,31 @@ export function Grid() {
 
       // Copy (Ctrl/Cmd + C)
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        const selectedCells = selection
-          ? getSelectedCellsData()
-          : SheetController.getCell(activeSheet, activeCell).getValue();
-        navigator.clipboard.writeText(String(selectedCells));
+        e.preventDefault();
+        const data = await getSelectedCellsData(activeSheet, selection);
+        await navigator.clipboard.writeText(data);
       }
 
       // Cut (Ctrl/Cmd + X)
       if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-        const selectedCells = selection
-          ? getSelectedCellsData()
-          : SheetController.getCell(activeSheet, activeCell).getValue();
-        navigator.clipboard.writeText(String(selectedCells));
-        if (selection) {
-          clearSelectedCells();
-        } else {
-          const cell = SheetController.getCell(activeSheet, activeCell);
-          cell.clear();
-          updateCell(activeCell, cell);
-        }
+        e.preventDefault();
+        await copySelectedCells();
+        await clearSelectedCells();
       }
 
       // Paste (Ctrl/Cmd + V)
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        navigator.clipboard.readText().then((text) => {
-          if (selection) {
-            pasteToSelection(text);
-          } else {
-            const cell = SheetController.getCell(activeSheet, activeCell);
-            CellController.updateCellValue(cell, text);
-            updateCell(activeCell, cell);
-          }
-        });
+        e.preventDefault();
+        const text = await navigator.clipboard.readText();
+        if (selection) {
+          await pasteToSelection(text);
+        } else {
+          await axios.post('/api/cells', {
+            sheetId: activeSheet.id,
+            cellId: activeCell,
+            value: text
+          });
+        }
       }
 
       // Start editing on F2 or when typing any character
@@ -225,49 +246,94 @@ export function Grid() {
     canRedo,
   ]);
 
-  // Helper function to get data from selected cells
-  const getSelectedCellsData = () => {
-    if (!selection) return '';
-    const cells = SheetController.getCellsInRange(
-      activeSheet,
-      selection.start,
-      selection.end
-    );
-    return cells.map(cell => cell.getValue()).join('\t');
-  };
-
   // Clear all cells in selection
-  const clearSelectedCells = () => {
-    if (!selection) return;
-    const cells = SheetController.getCellsInRange(
-      activeSheet,
-      selection.start,
-      selection.end
-    );
-    cells.forEach(cell => {
-      cell.clear();
-      updateCell(cell.getCellReference(), cell);
-    });
+  const clearSelectedCells = async () => {
+    if (!selection || !activeSheet) return;
+
+    try {
+      const startCoords = getCellCoords(selection.start);
+      const endCoords = getCellCoords(selection.end);
+
+      const minCol = Math.min(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+      const maxCol = Math.max(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+      const minRow = Math.min(startCoords.row, endCoords.row);
+      const maxRow = Math.max(startCoords.row, endCoords.row);
+
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const cellId = `${String.fromCharCode(col)}${row}`;
+          await axios.delete('/api/cells', {
+            params: {
+              sheetId: activeSheet.id,
+              cellId
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to clear cells:', error);
+    }
   };
 
-  // Paste data into selected cells
-  const pasteToSelection = (text: string) => {
-    const rows = text.split('\n');
-    const startCell = selection?.start || activeCell;
-    if (!startCell) return;
+  // Copy selected cells data
+  const copySelectedCells = async () => {
+    if (!selection || !activeSheet) return;
 
-    const { col: startCol, row: startRow } = getCellCoords(startCell);
-    rows.forEach((row, rowIndex) => {
-      const cells = row.split('\t');
-      cells.forEach((cellValue, colIndex) => {
-        const newCol = String.fromCharCode(startCol.charCodeAt(0) + colIndex);
-        const newRow = startRow + rowIndex;
-        const cellId = `${newCol}${newRow}`;
-        const cell = SheetController.getCell(activeSheet, cellId);
-        CellController.updateCellValue(cell, cellValue);
-        updateCell(cellId, cell);
-      });
-    });
+    try {
+      const startCoords = getCellCoords(selection.start);
+      const endCoords = getCellCoords(selection.end);
+
+      const minCol = Math.min(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+      const maxCol = Math.max(startCoords.col.charCodeAt(0), endCoords.col.charCodeAt(0));
+      const minRow = Math.min(startCoords.row, endCoords.row);
+      const maxRow = Math.max(startCoords.row, endCoords.row);
+
+      let copyData = '';
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const cellId = `${String.fromCharCode(col)}${row}`;
+          const response = await axios.get('/api/cells', {
+            params: {
+              sheetId: activeSheet.id,
+              cellId
+            }
+          });
+          copyData += (response.data.success ? response.data.data.value : '') + '\t';
+        }
+        copyData = copyData.slice(0, -1) + '\n';
+      }
+
+      await navigator.clipboard.writeText(copyData.trim());
+    } catch (error) {
+      console.error('Failed to copy cells:', error);
+    }
+  };
+
+  // Paste data to selection
+  const pasteToSelection = async (text: string) => {
+    if (!selection || !activeSheet) return;
+
+    const rows = text.split('\n');
+    const startCoords = getCellCoords(selection.start);
+
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].split('\t');
+        for (let j = 0; j < cells.length; j++) {
+          const col = String.fromCharCode(startCoords.col.charCodeAt(0) + j);
+          const row = startCoords.row + i;
+          const cellId = `${col}${row}`;
+
+          await axios.post('/api/cells', {
+            sheetId: activeSheet.id,
+            cellId,
+            value: cells[j]
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to paste cells:', error);
+    }
   };
 
   // Get selection edge information for a cell
@@ -332,43 +398,148 @@ export function Grid() {
   };
 
   // Clear content from a column
-  const clearColumnContent = (col: string) => {
-    rows.forEach((row) => {
-      const cellId = `${col}${row}`;
-      const cell = SheetController.getCell(activeSheet, cellId);
-      cell.clear();
-      updateCell(cellId, cell);
-    });
-    setSelection(null);
-    setContextMenu(null);
+  const clearColumnContent = async (col: string) => {
+    if (!activeSheet) return;
+
+    try {
+      for (const row of rows) {
+        const cellId = `${col}${row}`;
+        await axios.delete('/api/cells', {
+          params: {
+            sheetId: activeSheet.id,
+            cellId
+          }
+        });
+      }
+      setSelection(null);
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Failed to clear column:', error);
+    }
   };
 
   // Clear content from a row
-  const clearRowContent = (row: number) => {
-    columns.forEach((col) => {
-      const cellId = `${col}${row}`;
-      const cell = SheetController.getCell(activeSheet, cellId);
-      cell.clear();
-      updateCell(cellId, cell);
-    });
-    setSelection(null);
-    setContextMenu(null);
+  const clearRowContent = async (row: number) => {
+    if (!activeSheet) return;
+
+    try {
+      for (const col of columns) {
+        const cellId = `${col}${row}`;
+        await axios.delete('/api/cells', {
+          params: {
+            sheetId: activeSheet.id,
+            cellId
+          }
+        });
+      }
+      setSelection(null);
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Failed to clear row:', error);
+    }
   };
 
-  // Delete a column and shift remaining columns left
-  const deleteColumn = (col: string) => {
-    SheetController.clearColumn(activeSheet, col);
-    SheetController.shiftColumnsLeft(activeSheet, col);
-    setSelection(null);
-    setContextMenu(null);
+  // Delete a column
+  const deleteColumn = async (col: string) => {
+    if (!activeSheet) return;
+
+    try {
+      // First clear the column
+      await clearColumnContent(col);
+
+      // Then shift remaining columns left
+      const colIndex = columns.indexOf(col);
+      if (colIndex === -1) return;
+
+      for (let i = colIndex + 1; i < columns.length; i++) {
+        for (const row of rows) {
+          const fromCellId = `${columns[i]}${row}`;
+          const toCellId = `${columns[i - 1]}${row}`;
+
+          // Get data from the right cell
+          const response = await axios.get('/api/cells', {
+            params: {
+              sheetId: activeSheet.id,
+              cellId: fromCellId
+            }
+          });
+
+          if (response.data.success) {
+            // Move data to the left cell
+            await axios.post('/api/cells', {
+              sheetId: activeSheet.id,
+              cellId: toCellId,
+              value: response.data.data.value,
+              formula: response.data.data.formula,
+              style: response.data.data.style
+            });
+
+            // Clear the right cell
+            await axios.delete('/api/cells', {
+              params: {
+                sheetId: activeSheet.id,
+                cellId: fromCellId
+              }
+            });
+          }
+        }
+      }
+
+      setSelection(null);
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Failed to delete column:', error);
+    }
   };
 
-  // Delete a row and shift remaining rows up 
-  const deleteRow = (row: number) => {
-    SheetController.clearRow(activeSheet, row);
-    SheetController.shiftRowsUp(activeSheet, row);
-    setSelection(null);
-    setContextMenu(null);
+  // Delete a row
+  const deleteRow = async (row: number) => {
+    if (!activeSheet) return;
+
+    try {
+      // First clear the row
+      await clearRowContent(row);
+
+      // Then shift remaining rows up
+      for (let i = row + 1; i <= rows.length; i++) {
+        for (const col of columns) {
+          const fromCellId = `${col}${i}`;
+          const toCellId = `${col}${i - 1}`;
+
+          // Get data from the cell below
+          const response = await axios.get('/api/cells', {
+            params: {
+              sheetId: activeSheet.id,
+              cellId: fromCellId
+            }
+          });
+
+          if (response.data.success) {
+            // Move data to the cell above
+            await axios.post('/api/cells', {
+              sheetId: activeSheet.id,
+              cellId: toCellId,
+              value: response.data.data.value,
+              formula: response.data.data.formula,
+              style: response.data.data.style
+            });
+
+            // Clear the cell below
+            await axios.delete('/api/cells', {
+              params: {
+                sheetId: activeSheet.id,
+                cellId: fromCellId
+              }
+            });
+          }
+        }
+      }
+
+      setSelection(null);
+      setContextMenu(null);
+    } catch (error) {
+      console.error('Failed to delete row:', error);
+    }
   };
 
   // Start column/row resize operation
@@ -423,81 +594,82 @@ export function Grid() {
   }, [resizing]);
 
   // Get computed styles for a cell
-  const getCellStyles = (cellStyle: CellStyle = {}) => ({
-    fontFamily: cellStyle.fontFamily || 'Arial, sans-serif',
-    fontSize: cellStyle.fontSize ? `${cellStyle.fontSize}px` : '12px',
-    fontWeight: cellStyle.bold ? 'bold' : 'normal',
-    fontStyle: cellStyle.italic ? 'italic' : 'normal',
-    textDecoration: cellStyle.underline ? 'underline' : 'none',
-    color: cellStyle.textColor || '#000',
-    backgroundColor: cellStyle.backgroundColor || 'transparent',
-    textAlign: cellStyle.align || 'left',
-    WebkitFontSmoothing: 'antialiased',
-    MozOsxFontSmoothing: 'grayscale',
+  const getCellStyles = (style: CellStyle = {}): React.CSSProperties => ({
+    fontWeight: style.bold ? 'bold' : 'normal',
+    fontStyle: style.italic ? 'italic' : 'normal',
+    textDecoration: style.underline ? 'underline' : 'none',
+    textAlign: style.align || 'left',
+    backgroundColor: style.backgroundColor || 'white',
+    color: style.textColor || 'black',
+    width: '100px',
+    height: '25px',
   });
 
+  // Column Headers Component
+  const ColumnHeaders = () => (
+    <div className="flex">
+      {columns.map(col => (
+        <div
+          key={col}
+          className="w-[100px] h-[25px] bg-gray-100 border-r border-b border-gray-300 flex items-center justify-center"
+          onContextMenu={(e) => handleHeaderContextMenu(e, col)}
+        >
+          {col}
+        </div>
+      ))}
+    </div>
+  );
+
+  // Row Headers Component
+  const RowHeaders = () => (
+    <div className="flex flex-col">
+      {rows.map(row => (
+        <div
+          key={row}
+          className="w-[40px] h-[25px] bg-gray-100 border-r border-b border-gray-300 flex items-center justify-center"
+          onContextMenu={(e) => handleRowContextMenu(e, row)}
+        >
+          {row}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="relative w-full" ref={gridRef}>
-      {/* Header row with corner cell */}
-      <div className="sticky top-0 z-10 flex bg-white">
-        {/* Corner cell */}
-        <div className="sticky left-0 z-20 w-[40px] h-[24px] bg-[#f8f9fa] border-r border-b flex items-center justify-center">
-          <div className="w-full h-full bg-[#f8f9fa] border-r border-b" />
-        </div>
-
-        {/* Column headers */}
-        {columns.map((col) => (
-          <div key={col} className="relative">
-            <div
-              className={`
-                w-[80px] h-[24px] shrink-0 border-r border-b 
-                bg-[#f8f9fa] text-[#666] font-medium
-                flex items-center justify-center text-xs
-                hover:bg-gray-100 cursor-pointer
-                ${selection?.start.startsWith(col) ? 'bg-[#e6f0eb]' : ''}
-              `}
-              onContextMenu={(e) => handleHeaderContextMenu(e, col)}
-            >
-              {col}
-            </div>
-            {/* Column resize handle */}
-            <div className="resize-handle-col" />
-          </div>
-        ))}
-      </div>
-
-      {/* Grid content */}
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="flex">
-        {/* Row numbers */}
-        <div className="sticky left-0 z-10 bg-white">
-          {rows.map((row) => (
-            <div key={row} className="relative">
-              <div
-                className={`
-                  w-[40px] h-[20px] shrink-0 border-r border-b 
-                  bg-[#f8f9fa] text-[#666] font-medium
-                  flex items-center justify-center text-xs
-                  hover:bg-gray-100 cursor-pointer
-                  ${selection?.start.endsWith(row.toString()) ? 'bg-[#e6f0eb]' : ''}
-                `}
-                onContextMenu={(e) => handleRowContextMenu(e, row)}
-              >
-                {row}
-              </div>
-              {/* Row resize handle */}
-              <div className="resize-handle-row" />
-            </div>
-          ))}
-        </div>
+        <div className="w-[40px] h-[25px] bg-gray-100 border-r border-b border-gray-300" />
+        <ColumnHeaders />
+      </div>
+      <div className="flex flex-1 overflow-auto">
+        <RowHeaders />
+        <div className="flex-1">
+          <div className="grid">
+            {rows.map(row => (
+              <div key={row} className="flex">
+                {columns.map(col => {
+                  const cellId = `${col}${row}`;
+                  const isSelected = selection && 
+                    cellId >= selection.start && 
+                    cellId <= selection.end;
 
-        {/* Cells Grid Container */}
-        <Cells
-          rows={rows}
-          columns={columns}
-          getCellStyles={getCellStyles}
-          isDragging={isDragging}
-          setIsDragging={setIsDragging}
-        />
+                  return (
+                    <Cell
+                      key={cellId}
+                      cellId={cellId}
+                      isActive={activeCell === cellId}
+                      isDragging={isDragging}
+                      style={getCellStyles()}
+                      onMouseEnter={() => handleMouseEnter(cellId)}
+                      onClick={() => handleMouseDown(cellId)}
+                      onDoubleClick={() => setActiveCell(cellId)}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

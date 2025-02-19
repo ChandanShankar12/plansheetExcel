@@ -1,39 +1,33 @@
 'use client';
 
 import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { Sheet } from '@/server/models/sheet';
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { Sheet } from '@/server/models/sheet';
 
 export function SheetsBar() {
-  const { 
-    activeSheet, 
-    sheets, 
-    addSheet, 
-    setActiveSheet,
-    spreadsheet 
-  } = useSpreadsheetContext();
-  
+  const { spreadsheet, addSheet, activeSheet, setActiveSheet } = useSpreadsheetContext();
+  const [sheets, setSheets] = useState<Sheet[]>([]);
   const [editingSheet, setEditingSheet] = useState<number | null>(null);
   const [newSheetName, setNewSheetName] = useState('');
 
+  // Update local sheets state when spreadsheet changes
   useEffect(() => {
-    if (sheets.length === 0) {
+    if (spreadsheet) {
+      setSheets(spreadsheet.getAllSheets());
+    }
+  }, [spreadsheet]);
+
+  // Create initial sheet if none exists
+  useEffect(() => {
+    if (sheets && sheets.length === 0) {
       addSheet('Sheet 1');
     }
-  }, [sheets.length, addSheet]);
+  }, [sheets, addSheet]);
 
   const handleAddSheet = () => {
-    const sheetNumber = sheets.length + 1;
-    const baseName = 'Sheet ';
-    let newName = `${baseName}${sheetNumber}`;
-    
-    while (sheets.some(sheet => sheet.name === newName)) {
-      newName = `${baseName}${sheetNumber + 1}`;
-    }
-
-    const newSheet = addSheet(newName);
-    setActiveSheet(newSheet);
+    const sheetNumber = sheets ? sheets.length + 1 : 1;
+    addSheet(`Sheet ${sheetNumber}`);
   };
 
   const handleSheetClick = (sheet: Sheet) => {
@@ -56,6 +50,8 @@ export function SheetsBar() {
       setEditingSheet(null);
     }
   };
+
+  if (!spreadsheet) return null;
 
   return (
     <div className="flex items-center h-8 bg-[#f8f9fa] border-t">

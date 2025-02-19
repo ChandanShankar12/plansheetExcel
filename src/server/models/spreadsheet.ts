@@ -2,11 +2,13 @@
 import { Sheet } from "./sheet";
 
 export class Spreadsheet {
-  sheets: Sheet[] = [];
-  activeSheetId: number | null = null;
+  private sheets: Sheet[] = [];
+  private activeSheetId: number | null = null;
+  private workbookId: string;
 
-  constructor() {
-    const initialSheet = new Sheet('Sheet 1');
+  constructor(workbookId: string) {
+    this.workbookId = workbookId;
+    const initialSheet = new Sheet('Sheet 1', this.workbookId);
     this.sheets.push(initialSheet);
     this.activeSheetId = initialSheet.id;
   }
@@ -42,15 +44,20 @@ export class Spreadsheet {
     return this.getSheetById(this.activeSheetId);
   }
 
+  getWorkbookId(): string {
+    return this.workbookId;
+  }
+
   toJSON() {
     return {
       sheets: this.sheets.map(sheet => sheet.toJSON()),
-      activeSheetId: this.activeSheetId
+      activeSheetId: this.activeSheetId,
+      workbookId: this.workbookId
     };
   }
 
   static fromJSON(data: any): Spreadsheet {
-    const spreadsheet = new Spreadsheet();
+    const spreadsheet = new Spreadsheet(data.workbookId);
     spreadsheet.sheets = data.sheets.map((sheetData: any) => Sheet.fromJSON(sheetData));
     spreadsheet.activeSheetId = data.activeSheetId;
     return spreadsheet;

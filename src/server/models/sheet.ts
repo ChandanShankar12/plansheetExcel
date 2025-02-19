@@ -4,21 +4,20 @@ import { Cell } from "./cell";
 export class Sheet {
   id: number;
   name: string;
-  cells: Map<string, Cell>;
+  private cells: Map<string, Cell>;
+  private spreadsheetId: string; // Reference to parent spreadsheet
 
-  constructor(name: string) {
-    this.name = name;
+  constructor(name: string, spreadsheetId: string) {
     this.id = Date.now();
+    this.name = name;
+    this.spreadsheetId = spreadsheetId;
     this.cells = new Map();
   }
 
   getCell(cellId: string): Cell {
     if (!this.cells.has(cellId)) {
-      const newCell = new Cell();
       const [col, row] = cellId.match(/([A-Z]+)(\d+)/)?.slice(1) || [];
-      newCell.row = parseInt(row);
-      newCell.column = col;
-      newCell.sheet = this;
+      const newCell = new Cell(this.id, parseInt(row), col);
       this.cells.set(cellId, newCell);
     }
     return this.cells.get(cellId)!;
@@ -34,7 +33,7 @@ export class Sheet {
   }
 
   clone(): Sheet {
-    const clonedSheet = new Sheet(this.name);
+    const clonedSheet = new Sheet(this.name, this.spreadsheetId);
     clonedSheet.id = this.id;
     this.cells.forEach((cell, key) => {
       clonedSheet.cells.set(key, cell.clone());
@@ -42,10 +41,15 @@ export class Sheet {
     return clonedSheet;
   }
 
+  getSpreadsheetId(): string {
+    return this.spreadsheetId;
+  }
+
   toJSON() {
     return {
       id: this.id,
       name: this.name,
+      spreadsheetId: this.spreadsheetId,
       cells: Array.from(this.cells.entries()).map(([key, cell]) => ({
         key,
         cell: cell.toJSON()
@@ -54,7 +58,7 @@ export class Sheet {
   }
 
   static fromJSON(data: any): Sheet {
-    const sheet = new Sheet(data.name);
+    const sheet = new Sheet(data.name, data.spreadsheetId);
     sheet.id = data.id;
     data.cells.forEach(({ key, cell }: any) => {
       sheet.cells.set(key, Cell.fromJSON(cell));

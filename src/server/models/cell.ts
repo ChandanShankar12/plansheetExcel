@@ -1,18 +1,23 @@
 // src/server/models/Cell.ts
 import { Sheet } from "./sheet";
+import { CellStyle } from "@/lib/types";
 
 export class Cell {
   id: string;
   private value: any = null;
   private formula: string = "";
-  sheet?: Sheet;
-  row?: number;
-  column?: string;
+  private sheetId: number; // Reference to parent sheet
+  row: number;
+  column: string;
   style: CellStyle = {};
   private isDirty: boolean = false; // Track if cell has been modified
+  private isModified: boolean = false; // New flag to track if cell was ever modified
 
-  constructor() {
+  constructor(sheetId: number, row: number, column: string) {
     this.id = crypto.randomUUID();
+    this.sheetId = sheetId;
+    this.row = row;
+    this.column = column;
   }
 
   getValue(): any {
@@ -23,7 +28,8 @@ export class Cell {
     if (this.value !== value) {
       this.value = value;
       this.formula = "";
-      this.isDirty = true; // Mark as modified
+      this.isDirty = true;
+      this.isModified = true; // Mark as modified when value changes
     }
   }
 
@@ -40,8 +46,26 @@ export class Cell {
   }
 
   setFormula(formula: string): void {
-    this.formula = formula;
-    this.value = this.evaluate();
+    if (this.formula !== formula) {
+      this.formula = formula;
+      this.value = this.evaluate();
+      this.isModified = true; // Mark as modified when formula changes
+    }
+  }
+
+  setStyle(style: CellStyle): void {
+    if (JSON.stringify(this.style) !== JSON.stringify(style)) {
+      this.style = style;
+      this.isModified = true; // Mark as modified when style changes
+    }
+  }
+
+  isModifiedCell(): boolean {
+    return this.isModified;
+  }
+
+  clearModifiedFlag(): void {
+    this.isModified = false;
   }
 
   private evaluate(): string | null {
@@ -88,9 +112,9 @@ export class Cell {
     this.style.backgroundColor = color;
   }
 
-  setStroke(stroke: string): void {
-    this.style.stroke = stroke;
-  }
+  // setStroke(stroke: string): void {
+  //   this.style.borderColor = stroke;
+  // }
 
   setAlignment(align: 'left' | 'center' | 'right'): void {
     this.style.align = align;
@@ -114,13 +138,15 @@ export class Cell {
 
   // Clone cell
   clone(): Cell {
-    const clonedCell = new Cell();
+    const clonedCell = new Cell(this.sheetId, this.row, this.column);
     clonedCell.setValue(this.value);
     clonedCell.setFormula(this.formula);
-    clonedCell.row = this.row;
-    clonedCell.column = this.column;
     clonedCell.style = {...this.style};
     return clonedCell;
+  }
+
+  getSheetId(): number {
+    return this.sheetId;
   }
 
   toJSON() {
@@ -128,6 +154,7 @@ export class Cell {
       id: this.id,
       value: this.value,
       formula: this.formula,
+      sheetId: this.sheetId,
       row: this.row,
       column: this.column,
       style: this.style
@@ -135,12 +162,10 @@ export class Cell {
   }
 
   static fromJSON(data: any): Cell {
-    const cell = new Cell();
+    const cell = new Cell(data.sheetId, data.row, data.column);
     cell.id = data.id;
     cell.setValue(data.value);
     cell.setFormula(data.formula);
-    cell.row = data.row;
-    cell.column = data.column;
     cell.style = data.style;
     return cell;
   }

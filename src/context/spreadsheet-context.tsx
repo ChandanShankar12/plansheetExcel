@@ -6,9 +6,12 @@ import { Cell } from '@/server/models/cell';
 import { Sheet } from '@/server/models/sheet';
 import { Spreadsheet } from '@/server/models/spreadsheet';
 import { Application } from '@/server/models/application';
-import { SpreadsheetController } from '@/server/controllers/spreadsheet-controller';
-import { CellController } from '@/server/controllers/cell-controller';
+import { ApplicationController } from '@/server/controllers/application.controller';
+import { SpreadsheetController } from '@/server/controllers/spreadsheet.controller';
+import { SheetController } from '@/server/controllers/sheet.controller';
+import { CellController } from '@/server/controllers/cell.controller';
 import axios from 'axios';
+import { CellData } from '@/lib/types';
 
 interface HistoryState {
   sheet: Sheet;
@@ -20,18 +23,16 @@ interface SpreadsheetContextType {
   setActiveCell: (cell: string | null) => void;
   activeSheet: Sheet;
   setActiveSheet: (sheet: Sheet) => void;
-  updateCell: (cellId: string, cell: Cell) => void;
+  updateCell: (cellId: string, value: any, formula?: string) => Promise<CellData | null>;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
   spreadsheet: Spreadsheet;
-  sheets: Sheet[];
-  addSheet: (name: string) => Sheet;
-  selection: Selection | null;
-  setSelection: (selection: Selection | null) => void;
+  addSheet: (name: string) => void;
+  selection: { start: string; end: string } | null;
+  setSelection: (selection: { start: string; end: string } | null) => void;
   application: Application;
-  setApplication: (app: Application) => void;
 }
 
 const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(
@@ -45,38 +46,31 @@ export function SpreadsheetProvider({
 }: {
   children: React.ReactNode;
 }) {
-  // Initialize Application and get active workbook's spreadsheet
-  const [application] = useState(() => new Application());
-  const [spreadsheet] = useState(() => {
-    const workbook = application.getActiveWorkbook();
-    if (!workbook) throw new Error('No active workbook');
-    return workbook.getSpreadsheet();
+  // Initialize from singleton Application
+  const [application] = useState(() => Application.getInstance());
+  const [workbook] = useState(() => {
+    const activeWorkbook = application.getActiveWorkbook();
+    if (!activeWorkbook) throw new Error('No active workbook');
+    return activeWorkbook;
   });
+
+  const [spreadsheet] = useState(() => workbook.getSpreadsheet());
 
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelection] = useState<{ start: string; end: string } | null>(null);
 
-  // Initialize first sheet if needed
+  // Initialize first sheet
   const [activeSheet, setActiveSheetState] = useState<Sheet>(() => {
-    const firstSheet = spreadsheet.getSheet('Sheet 1');
+    const firstSheet = spreadsheet.getActiveSheet();
     if (!firstSheet) {
-      const newSheet = SpreadsheetController.addSheet(spreadsheet, 'Sheet 1');
+      const newSheet = SpreadsheetController.addSheet(spreadsheet.getWorkbookId(), 'Sheet 1');
+      if (!newSheet) throw new Error('Failed to create initial sheet');
       return newSheet;
     }
     return firstSheet;
   });
-
-  // Track sheet data
-  const [sheetData, setSheetData] = useState<Map<number, Sheet>>(new Map());
-
-  // Update sheet data when active sheet changes
-  useEffect(() => {
-    if (activeSheet) {
-      setSheetData(prev => new Map(prev).set(activeSheet.id, activeSheet));
-    }
-  }, [activeSheet]);
 
   const pushToHistory = (newState: HistoryState) => {
     const newHistory = [...history.slice(0, currentIndex + 1), newState];
@@ -87,38 +81,56 @@ export function SpreadsheetProvider({
     setCurrentIndex(newHistory.length - 1);
   };
 
-  const updateCell = async (cellId: string, cell: Cell) => {
+  const updateCell = async (cellId: string, value: any, formula?: string) => {
+    if (!activeSheet) return null;
+
     try {
-      // Only save if cell is dirty (has been modified)
-      if (cell.isDirtyCell()) {
-        const value = cell.getValue();
-        
-        // Only save non-empty values
-        if (value !== null && value !== '') {
-          const response = await axios.post('/api/cells', {
-            sheetName: activeSheet.name,
-            cellId,
-            value: value,
-            formula: cell.getFormula(),
-            style: cell.style
-          });
-
-          if (!response.data.success) {
-            throw new Error('Failed to save cell data');
-          }
-          
-          cell.clearDirtyFlag(); // Clear dirty flag after successful save
-        }
-      }
-
-      pushToHistory({
-        sheet: activeSheet,
-        activeCell,
+      const response = await axios.post('/api/cells', {
+        sheetId: activeSheet.id,
+        cellId,
+        value,
+        formula
       });
 
+      if (response.data.success) {
+        const cell = activeSheet.getCell(cellId);
+        if (cell) {
+          cell.setValue(value);
+          if (formula) cell.setFormula(formula);
+        }
+        return response.data.data;
+      }
     } catch (error) {
       console.error('Failed to update cell:', error);
-      throw error;
+    }
+    return null;
+  };
+
+  const loadCell = async (cellId: string) => {
+    if (!activeSheet) return null;
+
+    try {
+      const response = await axios.get('/api/cells/get', {
+        params: {
+          sheetId: activeSheet.id,
+          cellId,
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        const cellData = response.data.data;
+        const cell = activeSheet.getCell(cellId);
+        if (cell) {
+          cell.setValue(cellData.value);
+          cell.setFormula(cellData.formula);
+          cell.style = cellData.style;
+        }
+        return cellData;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to load cell:', error);
+      return null;
     }
   };
 
@@ -140,19 +152,16 @@ export function SpreadsheetProvider({
     }
   };
 
-  const addSheet = (name: string): Sheet => {
-    const newSheet = new Sheet(name);
-    spreadsheet.addSheet(newSheet);
-    setActiveSheetState(newSheet);
-    return newSheet;
+  const addSheet = (name: string) => {
+    const newSheet = SpreadsheetController.addSheet(spreadsheet.getWorkbookId(), name);
+    if (newSheet) {
+      setActiveSheetState(newSheet);
+    }
   };
 
   const setActiveSheet = (sheet: Sheet) => {
+    SpreadsheetController.setActiveSheet(spreadsheet.getWorkbookId(), sheet.id);
     setActiveSheetState(sheet);
-  };
-
-  const setApplication = (app: Application) => {
-    // Implementation when needed for file loading
   };
 
   return (
@@ -168,12 +177,10 @@ export function SpreadsheetProvider({
         canUndo: currentIndex > 0,
         canRedo: currentIndex < history.length - 1,
         spreadsheet,
-        sheets: spreadsheet.sheets,
         addSheet,
         selection,
         setSelection,
         application,
-        setApplication,
       }}
     >
       {children}
