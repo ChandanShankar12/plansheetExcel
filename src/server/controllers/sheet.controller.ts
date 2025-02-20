@@ -1,40 +1,73 @@
 import { SheetService } from '../services/sheet.service';
-import { Sheet } from '../models/sheet';
-import { Cell } from '../models/cell';
-import { CellStyle } from '@/lib/types';
 
 export class SheetController {
-  private static service = SheetService.getInstance();
+  private static instance: SheetController | null = null;
+  private sheetService: SheetService;
 
-  static createSheet(name: string, spreadsheetId: string): Sheet {
-    return this.service.createSheet(name, spreadsheetId);
+  private constructor() {
+    this.sheetService = SheetService.getInstance();
   }
 
-  static getSheet(id: number): Sheet | undefined {
-    return this.service.getSheet(id);
+  static getInstance(): SheetController {
+    if (!SheetController.instance) {
+      SheetController.instance = new SheetController();
+    }
+    return SheetController.instance;
   }
 
-  static getSheetByName(spreadsheetId: string, name: string): Sheet | undefined {
-    return this.service.getSheetByName(spreadsheetId, name);
+  async getSheet(sheetId: number) {
+    try {
+      return this.sheetService.getSheet(sheetId);
+    } catch (error) {
+      throw new Error('Failed to get sheet');
+    }
   }
 
-  static updateSheetName(id: number, newName: string): boolean {
-    return this.service.updateSheetName(id, newName);
+  async getAllCells(sheetId: number) {
+    try {
+      return this.sheetService.getAllCells(sheetId);
+    } catch (error) {
+      throw new Error('Failed to get cells');
+    }
   }
 
-  static getCell(sheetId: number, cellId: string): Cell | undefined {
-    return this.service.getCell(sheetId, cellId);
+  async getCellValue(sheetId: number, cellId: string) {
+    try {
+      return this.sheetService.getCellValue(sheetId, cellId);
+    } catch (error) {
+      throw new Error('Failed to get cell value');
+    }
   }
 
-  static updateCell(sheetId: number, cellId: string, value: any, formula?: string): boolean {
-    return this.service.updateCell(sheetId, cellId, value, formula);
+  async setCellValue(sheetId: number, cellId: string, value: any) {
+    try {
+      return this.sheetService.setCellValue(sheetId, cellId, value);
+    } catch (error) {
+      throw new Error('Failed to set cell value');
+    }
   }
 
-  static getCellsInRange(sheetId: number, startCell: string, endCell: string): Cell[] {
-    return this.service.getCellsInRange(sheetId, startCell, endCell);
+  async getModifiedCells(sheetId: number) {
+    try {
+      return this.sheetService.getModifiedCells(sheetId);
+    } catch (error) {
+      throw new Error('Failed to get modified cells');
+    }
   }
 
-  static cloneSheet(id: number, newName: string): Sheet | undefined {
-    return this.service.cloneSheet(id, newName);
+  async clearModifiedCells(sheetId: number) {
+    try {
+      return this.sheetService.clearModifiedCells(sheetId);
+    } catch (error) {
+      throw new Error('Failed to clear modified cells');
+    }
+  }
+
+  async setName(sheetId: number, name: string) {
+    try {
+      return this.sheetService.setName(sheetId, name);
+    } catch (error) {
+      throw new Error('Failed to set sheet name');
+    }
   }
 } 

@@ -1,5 +1,5 @@
 import { Cell } from '@/server/models/cell';
-import { Sheet } from '@/server/models/sheet';
+import { Sheet } from '@/server/models/sheets';
 
 export interface CellData {
   id: string;

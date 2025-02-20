@@ -22,61 +22,40 @@ export function Cell({
   style,
   onMouseEnter,
   onClick,
-  onDoubleClick,
+  onDoubleClick
 }: CellProps) {
   const { activeSheet, updateCell } = useSpreadsheetContext();
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState<string>('');
-  const [displayValue, setDisplayValue] = useState<string>('');
+  const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const [cellData, setCellData] = useState<CellData | null>(null);
 
-  // Remove the initial fetch effect - we only want to fetch when editing starts
-  const handleDoubleClick = async () => {
-    onDoubleClick();
-    
-    // Only fetch data if we haven't loaded it yet
-    if (!cellData && activeSheet) {
-      try {
-        const response = await axios.get<{ success: boolean; data: CellData | null }>('/api/cells/get', {
-          params: {
-            sheetId: activeSheet.id,
-            cellId,
-          }
-        });
-
-        if (response.data.success && response.data.data) {
-          setCellData(response.data.data);
-          const value = response.data.data.value?.toString() ?? '';
-          setDisplayValue(value);
-          setEditValue(value);
-        }
-      } catch (error) {
-        console.error('Failed to fetch cell data:', error);
-      }
-    } else {
-      setEditValue(displayValue);
+  useEffect(() => {
+    if (isActive && !isEditing) {
+      const cell = activeSheet.getCell(cellId);
+      setValue(cell.getValue() || '');
     }
-    
+  }, [isActive, cellId, activeSheet, isEditing]);
+
+  const handleDoubleClick = () => {
     setIsEditing(true);
+    onDoubleClick?.();
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
   };
 
-  const handleEdit = async () => {
-    if (!editValue.trim() || !activeSheet) {
+  const handleBlur = async () => {
+    if (isEditing) {
+      await updateCell(cellId, value);
       setIsEditing(false);
-      return;
     }
+  };
 
-    try {
-      const result = await updateCell(cellId, editValue);
-      if (result && typeof result === 'object' && 'value' in result) {
-        const updatedCell = result as CellData;
-        setCellData(updatedCell);
-        setDisplayValue(updatedCell.value?.toString() ?? '');
-      }
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Failed to update cell:', error);
+  const handleKeyDown = async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      await handleBlur();
+    } else if (e.key === 'Escape') {
       setIsEditing(false);
     }
   };
@@ -84,9 +63,10 @@ export function Cell({
   return (
     <div
       className={`
-        border-r border-b border-gray-300
-        ${isActive ? 'ring-2 ring-blue-500' : ''}
-        ${isEditing ? 'z-10' : ''}
+        border-r border-b border-gray-300 
+        relative overflow-hidden
+        ${isActive ? 'z-10 outline outline-2 outline-blue-500' : ''}
+        ${isDragging ? 'bg-blue-50' : ''}
       `}
       style={style}
       onMouseEnter={onMouseEnter}
@@ -96,24 +76,15 @@ export function Cell({
       {isEditing ? (
         <input
           ref={inputRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleEdit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleEdit();
-            } else if (e.key === 'Escape') {
-              setIsEditing(false);
-              setEditValue(displayValue);
-            }
-          }}
-          className="w-full h-full px-1 outline-none"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="absolute inset-0 w-full h-full px-2 outline-none"
           autoFocus
         />
       ) : (
-        <div className="w-full h-full px-1 truncate flex items-center">
-          {displayValue}
-        </div>
+        <div className="px-2 py-1 truncate">{value}</div>
       )}
     </div>
   );

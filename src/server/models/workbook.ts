@@ -1,4 +1,4 @@
-import { Spreadsheet } from './spreadsheet';
+import { Sheet } from './sheets';
 
 export interface UserConfig {
   theme: 'light' | 'dark';
@@ -10,13 +10,14 @@ export interface UserConfig {
 }
 
 export class Workbook {
-  private spreadsheet: Spreadsheet;
+  private static instance: Workbook | null = null;
+  private sheets: Sheet[] = [];
+  private readonly id: string;
   private config: UserConfig;
-  public readonly id: string;
 
-  constructor(id?: string) {
-    this.id = id || Math.random().toString(36).substring(7);
-    this.spreadsheet = new Spreadsheet(this.id);
+  private constructor() {
+    this.id = crypto.randomUUID();
+    this.sheets.push(new Sheet(0, 'Sheet1', this.id));
     this.config = {
       theme: 'light',
       language: 'en',
@@ -27,9 +28,29 @@ export class Workbook {
     };
   }
 
-  // Spreadsheet methods
-  getSpreadsheet(): Spreadsheet {
-    return this.spreadsheet;
+  static getInstance(): Workbook {
+    if (!Workbook.instance) {
+      Workbook.instance = new Workbook();
+    }
+    return Workbook.instance;
+  }
+
+  getId(): string {
+    return this.id;
+  }
+
+  getSheets(): Sheet[] {
+    return this.sheets;
+  }
+
+  addSheet(name: string): Sheet {
+    const newSheet = new Sheet(this.sheets.length, name, this.id);
+    this.sheets.push(newSheet);
+    return newSheet;
+  }
+
+  getSheet(id: number): Sheet | undefined {
+    return this.sheets.find(sheet => sheet.id === id);
   }
 
   // Config methods
@@ -77,20 +98,23 @@ export class Workbook {
   // Save/Load methods
   toJSON() {
     return {
-      id: this.id,
+      workbookId: this.id,
       config: this.config,
-      spreadsheet: this.spreadsheet
+      sheets: this.sheets.map(sheet => sheet.toJSON())
     };
   }
 
   static fromJSON(data: any): Workbook {
-    const workbook = new Workbook(data.id);
+    if (!Workbook.instance) {
+      Workbook.instance = new Workbook();
+    }
+    const workbook = Workbook.instance;
+    workbook.sheets = data.sheets.map((sheetData: any) => Sheet.fromJSON(sheetData));
     workbook.config = {
       ...data.config,
       lastModified: new Date(data.config.lastModified),
       createdAt: new Date(data.config.createdAt)
     };
-    workbook.spreadsheet = Spreadsheet.fromJSON(data.spreadsheet);
     return workbook;
   }
 } 

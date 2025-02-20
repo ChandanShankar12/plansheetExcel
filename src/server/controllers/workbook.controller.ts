@@ -1,48 +1,49 @@
 import { WorkbookService } from '../services/workbook.service';
-import { Workbook } from '../models/workbook';
-import { Spreadsheet } from '../models/spreadsheet';
-import { UserConfig } from '../models/workbook';
 
 export class WorkbookController {
-  private static service = WorkbookService.getInstance();
+  private static instance: WorkbookController | null = null;
+  private workbookService: WorkbookService;
 
-  static createWorkbook(): Workbook {
-    return this.service.createWorkbook();
+  private constructor() {
+    this.workbookService = WorkbookService.getInstance();
   }
 
-  static getWorkbook(id: string): Workbook | undefined {
-    return this.service.getWorkbook(id);
+  static getInstance(): WorkbookController {
+    if (!WorkbookController.instance) {
+      WorkbookController.instance = new WorkbookController();
+    }
+    return WorkbookController.instance;
   }
 
-  static updateConfig(workbookId: string, config: Partial<UserConfig>): boolean {
-    return this.service.updateConfig(workbookId, config);
+  async getWorkbook() {
+    try {
+      return this.workbookService.getWorkbook();
+    } catch (error) {
+      throw new Error('Failed to get workbook');
+    }
   }
 
-  static getSpreadsheet(workbookId: string): Spreadsheet | undefined {
-    return this.service.getSpreadsheet(workbookId);
+  async addSheet(name: string) {
+    try {
+      return this.workbookService.addSheet(name);
+    } catch (error) {
+      throw new Error('Failed to add sheet');
+    }
   }
 
-  static setTheme(workbookId: string, theme: 'light' | 'dark'): boolean {
-    return this.service.setTheme(workbookId, theme);
+  async updateSheetName(sheetId: number, name: string) {
+    try {
+      return this.workbookService.updateSheetName(sheetId, name);
+    } catch (error) {
+      throw new Error('Failed to update sheet name');
+    }
   }
 
-  static setAutoSave(workbookId: string, enabled: boolean): boolean {
-    return this.service.setAutoSave(workbookId, enabled);
-  }
-
-  static duplicateWorkbook(workbookId: string): Workbook | undefined {
-    return this.service.duplicateWorkbook(workbookId);
-  }
-
-  static deleteWorkbook(id: string): boolean {
-    return this.service.deleteWorkbook(id);
-  }
-
-  static getLastModified(workbookId: string): Date | undefined {
-    return this.service.getLastModified(workbookId);
-  }
-
-  static isAutoSaveEnabled(workbookId: string): boolean | undefined {
-    return this.service.isAutoSaveEnabled(workbookId);
+  async updateConfig(config: Partial<UserConfig>) {
+    try {
+      return this.workbookService.updateConfig(config);
+    } catch (error) {
+      throw new Error('Failed to update config');
+    }
   }
 } 

@@ -1,35 +1,58 @@
-import { Application } from '../models/application';
-import { Workbook } from '../models/workbook';
 import { ApplicationService } from '../services/application.service';
+import { Workbook } from '../models/workbook';
 
 export class ApplicationController {
-  private static service = ApplicationService.getInstance();
+  private static instance: ApplicationController | null = null;
+  private applicationService: ApplicationService;
 
-  static getApplication(): Application {
-    return this.service.getApplication();
+  private constructor() {
+    this.applicationService = ApplicationService.getInstance();
   }
 
-  static createWorkbook(): Workbook {
-    return this.service.createWorkbook();
+  static getInstance(): ApplicationController {
+    if (!ApplicationController.instance) {
+      ApplicationController.instance = new ApplicationController();
+    }
+    return ApplicationController.instance;
   }
 
-  static getActiveWorkbook(): Workbook | undefined {
-    return this.service.getActiveWorkbook();
+  async getCurrentWorkbook(): Promise<Workbook> {
+    try {
+      return this.applicationService.getCurrentWorkbook();
+    } catch (error) {
+      throw new Error('Failed to get current workbook');
+    }
   }
 
-  static setActiveWorkbook(id: string): void {
-    this.service.setActiveWorkbook(id);
+  async getAllWorkbooks(): Promise<Workbook[]> {
+    try {
+      return this.applicationService.getAllWorkbooks();
+    } catch (error) {
+      throw new Error('Failed to get all workbooks');
+    }
   }
 
-  static getAllWorkbooks(): Workbook[] {
-    return this.service.getAllWorkbooks();
+  async removeWorkbook(id: string): Promise<void> {
+    try {
+      return this.applicationService.removeWorkbook(id);
+    } catch (error) {
+      throw new Error('Failed to remove workbook');
+    }
   }
 
-  static async saveWorkbook(): Promise<void> {
-    await this.service.saveWorkbook();
+  async saveApplicationState(): Promise<string> {
+    try {
+      return this.applicationService.saveApplicationState();
+    } catch (error) {
+      throw new Error('Failed to save application state');
+    }
   }
 
-  static async loadWorkbook(content: string): Promise<void> {
-    await this.service.loadWorkbook(content);
+  async loadApplicationState(state: string): Promise<void> {
+    try {
+      return this.applicationService.loadApplicationState(state);
+    } catch (error) {
+      throw new Error('Failed to load application state');
+    }
   }
 } 

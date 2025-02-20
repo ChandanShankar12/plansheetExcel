@@ -1,31 +1,50 @@
 import { CellService } from '../services/cell.service';
-import { Cell } from '../models/cell';
-import { CellStyle } from '@/lib/types';
+import { CellStyle } from '../models/cell';
 
 export class CellController {
-  private static service = CellService.getInstance();
+  private static instance: CellController | null = null;
+  private cellService: CellService;
 
-  static createCell(sheetId: number, row: number, column: string): Cell {
-    return this.service.createCell(sheetId, row, column);
+  private constructor() {
+    this.cellService = CellService.getInstance();
   }
 
-  static getCell(id: string) {
-    return this.service.getCell(id);
+  static getInstance(): CellController {
+    if (!CellController.instance) {
+      CellController.instance = new CellController();
+    }
+    return CellController.instance;
   }
 
-  static getCellByReference(sheetId: number, cellRef: string) {
-    return this.service.getCellByReference(sheetId, cellRef);
+  async getValue(sheetId: number, cellId: string) {
+    try {
+      return this.cellService.getValue(sheetId, cellId);
+    } catch (error) {
+      throw new Error('Failed to get cell value');
+    }
   }
 
-  static updateCell(id: string, value: any, formula?: string): boolean {
-    return this.service.updateCell(id, value, formula);
+  async setValue(sheetId: number, cellId: string, value: any) {
+    try {
+      return this.cellService.setValue(sheetId, cellId, value);
+    } catch (error) {
+      throw new Error('Failed to set cell value');
+    }
   }
 
-  static updateCellStyle(id: string, style: Partial<CellStyle>): boolean {
-    return this.service.updateCellStyle(id, style);
+  async setFormula(sheetId: number, cellId: string, formula: string) {
+    try {
+      return this.cellService.setFormula(sheetId, cellId, formula);
+    } catch (error) {
+      throw new Error('Failed to set formula');
+    }
   }
 
-  static evaluateFormula(cell: Cell): any {
-    return this.service.evaluateFormula(cell);
+  async setStyle(sheetId: number, cellId: string, style: Partial<CellStyle>) {
+    try {
+      return this.cellService.setStyle(sheetId, cellId, style);
+    } catch (error) {
+      throw new Error('Failed to set cell style');
+    }
   }
 } 
