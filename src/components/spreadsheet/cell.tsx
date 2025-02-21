@@ -1,40 +1,42 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheet } from '@/context/spreadsheet-context';
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import { motion } from 'framer-motion';
 import { CellData } from '@/lib/types';
 
 interface CellProps {
-  cellId: string;
-  isActive: boolean;
-  isDragging: boolean;
-  style: React.CSSProperties;
-  onMouseEnter: () => void;
-  onClick: () => void;
-  onDoubleClick: () => void;
+  id: string;
+  isActive?: boolean;
+  isDragging?: boolean;
+  onClick?: () => void;
+  onMouseEnter?: () => void;
+  onDoubleClick?: () => void;
 }
 
 export function Cell({
-  cellId,
+  id,
   isActive,
   isDragging,
-  style,
-  onMouseEnter,
   onClick,
+  onMouseEnter,
   onDoubleClick
 }: CellProps) {
-  const { activeSheet, updateCell } = useSpreadsheetContext();
-  const [isEditing, setIsEditing] = useState(false);
+  const { activeSheet, updateCell } = useSpreadsheet();
   const [value, setValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isActive && !isEditing) {
-      const cell = activeSheet.getCell(cellId);
-      setValue(cell.getValue() || '');
-    }
-  }, [isActive, cellId, activeSheet, isEditing]);
+    if (!activeSheet) return;
+    const cellData = activeSheet.getCell(id);
+    setValue(cellData.value || '');
+  }, [id, activeSheet]);
+
+  const handleChange = async (newValue: string) => {
+    if (!activeSheet) return;
+    await updateCell(id, { value: newValue });
+  };
 
   const handleDoubleClick = () => {
     setIsEditing(true);
@@ -45,8 +47,13 @@ export function Cell({
   };
 
   const handleBlur = async () => {
-    if (isEditing) {
-      await updateCell(cellId, value);
+    if (!isEditing) return;
+    
+    try {
+      await handleChange(value);
+    } catch (error) {
+      console.error('Failed to update cell:', error);
+    } finally {
       setIsEditing(false);
     }
   };
@@ -63,12 +70,13 @@ export function Cell({
   return (
     <div
       className={`
-        border-r border-b border-gray-300 
-        relative overflow-hidden
-        ${isActive ? 'z-10 outline outline-2 outline-blue-500' : ''}
-        ${isDragging ? 'bg-blue-50' : ''}
+        w-[100px] h-[24px] 
+        border-r border-b border-[#e1e3e6]
+        bg-white hover:bg-[#f8f9fa]
+        relative select-none
+        ${isActive ? 'z-10 outline outline-1 outline-[#1a73e8]' : ''}
+        ${isDragging ? 'bg-[#e8f0fe]' : ''}
       `}
-      style={style}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
       onDoubleClick={handleDoubleClick}
@@ -80,11 +88,13 @@ export function Cell({
           onChange={(e) => setValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="absolute inset-0 w-full h-full px-2 outline-none"
+          className="absolute inset-0 w-full h-full px-[3px] outline-none bg-white text-[13px]"
           autoFocus
         />
       ) : (
-        <div className="px-2 py-1 truncate">{value}</div>
+        <div className="px-[3px] py-[1px] h-full truncate text-[13px] leading-[22px]">
+          {value}
+        </div>
       )}
     </div>
   );

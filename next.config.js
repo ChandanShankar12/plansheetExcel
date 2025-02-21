@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  distDir: 'out',
   images: {
     unoptimized: true
   },
@@ -27,6 +25,12 @@ const nextConfig = {
       };
     }
     return config;
+  },
+  onDemandEntries: {
+    // Configure page lifetime
+    maxInactiveAge: 25 * 1000,
+    // Configure number of pages to be kept in memory
+    pagesBufferLength: 2,
   },
 };
 

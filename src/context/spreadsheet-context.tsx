@@ -1,167 +1,170 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
-import { Selection, CellData } from '@/lib/types';
-import { Cell } from '@/server/models/cell';
-import { Sheet } from '@/server/models/sheets';
-import { Spreadsheet } from '@/server/models/spreadsheet';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { Application } from '@/server/models/application';
-import { ApplicationController } from '@/server/controllers/application.controller';
-import { SpreadsheetController } from '@/server/controllers/spreadsheet.controller';
-import axios from 'axios';
-import { Workbook } from '@/server/models/workbook';
+import { Sheet } from '@/server/models/sheet';
+import { Selection, CellData } from '@/lib/types';
 
 interface SpreadsheetContextType {
+  // Core state
+  app: Application;
+  activeSheet: Sheet | null;
+  sheets: Sheet[];
+  
+  // UI state
   activeCell: string | null;
-  setActiveCell: (cell: string | null) => void;
-  activeSheet: Sheet;
-  setActiveSheet: (sheet: Sheet) => void;
-  updateCell: (cellId: string, value: any, formula?: string) => Promise<CellData | null>;
-  spreadsheet: Spreadsheet;
+  selection: Selection | null;
+  isTransitioning: boolean;
+
+  // Actions
   addSheet: (name?: string) => Promise<Sheet | null>;
-  selection: { start: string; end: string } | null;
-  setSelection: (selection: { start: string; end: string } | null) => void;
-  application: Application;
+  switchSheet: (sheet: Sheet) => Promise<void>;
+  updateCell: (id: string, data: Partial<CellData>) => Promise<void>;
+  setActiveCell: (id: string | null) => void;
+  setSelection: (selection: Selection) => void;
 }
 
 const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
 
-export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
-  // Initialize from singleton Workbook
-  const [workbook] = useState(() => Workbook.getInstance());
-  const [spreadsheet] = useState(() => workbook.getSpreadsheet());
-  
-  const [activeCell, setActiveCell] = useState<string | null>(null);
-  const [selection, setSelection] = useState<{ start: string; end: string } | null>(null);
+// Define the hook first
+export const useSpreadsheet = () => {
+  const context = useContext(SpreadsheetContext);
+  if (!context) {
+    throw new Error('useSpreadsheet must be used within SpreadsheetProvider');
+  }
+  return context;
+};
 
-  // Initialize first sheet
-  const [activeSheet, setActiveSheetState] = useState<Sheet>(() => {
-    const firstSheet = spreadsheet.getActiveSheet();
-    if (!firstSheet) {
-      // Create initial sheet if none exists
-      const newSheet = SpreadsheetController.addSheet('Sheet 1');
-      if (!newSheet) {
-        throw new Error('Failed to create initial sheet');
-      }
-      return newSheet;
+// Then export the alias
+export const useSpreadsheetContext = useSpreadsheet;
+
+export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
+  // Initialize core application
+  const [app] = useState(() => Application.getInstance());
+  
+  // Initialize sheets state
+  const [sheets, setSheets] = useState(() => {
+    const workbook = app.getWorkbook();
+    const existingSheets = workbook.getSheets();
+    if (existingSheets.length === 0) {
+      return [workbook.addSheet('Sheet 1')];
     }
-    return firstSheet;
+    return existingSheets;
   });
 
-  const getNextSheetName = () => {
-    const sheets = spreadsheet.getAllSheets();
-    const sheetNumbers = sheets.map(sheet => {
-      const match = sheet.name.match(/Sheet (\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    });
-    const maxNumber = Math.max(0, ...sheetNumbers);
-    return `Sheet ${maxNumber + 1}`;
-  };
+  // UI state
+  const [activeSheet, setActiveSheet] = useState<Sheet | null>(() => sheets[0] || null);
+  const [activeCell, setActiveCell] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const addSheet = async (name?: string): Promise<Sheet | null> => {
+  // Sheet operations
+  const addSheet = useCallback(async (name?: string): Promise<Sheet | null> => {
+    if (isTransitioning) return null;
+    
     try {
-      const sheetName = name || getNextSheetName();
-      const newSheet = SpreadsheetController.addSheet(sheetName);
-      if (!newSheet) {
+      setIsTransitioning(true);
+      const workbook = app.getWorkbook();
+      
+      // Generate sheet name if not provided
+      const sheetName = name || `Sheet ${sheets.length + 1}`;
+      
+      // Create sheet
+      const newSheet = workbook.addSheet(sheetName);
+      
+      // Save to backend
+      const response = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: sheetName })
+      });
+
+      if (!response.ok) {
         throw new Error('Failed to create sheet');
       }
 
-      // Update local state and switch to new sheet
-      setActiveSheetState(newSheet);
-      setSelection(null);
-      setActiveCell(null);
-
+      // Update state
+      // setSheets(prev => [...prev, newSheet]);
+      await switchSheet(newSheet);
+      
       return newSheet;
     } catch (error) {
       console.error('Failed to add sheet:', error);
       return null;
+    } finally {
+      setIsTransitioning(false);
     }
-  };
+  }, [app, sheets.length, isTransitioning]);
 
-  const setActiveSheet = async (sheet: Sheet) => {
+  const switchSheet = useCallback(async (sheet: Sheet): Promise<void> => {
+    if (isTransitioning) return;
+    
     try {
-      // Update active sheet in spreadsheet
-      SpreadsheetController.setActiveSheet(sheet.id);
-      setActiveSheetState(sheet);
-      setSelection(null);
-      setActiveCell(null);
-    } catch (error) {
-      console.error('Failed to switch sheet:', error);
-    }
-  };
-
-  const updateCell = async (cellId: string, value: any, formula?: string): Promise<CellData | null> => {
-    if (!activeSheet) return null;
-
-    try {
-      const cell = activeSheet.getCell(cellId);
-      cell.setValue(value);
-      if (formula) cell.setFormula(formula);
-      activeSheet.markCellAsModified(cellId);
-
-      // Save immediately for better UX
-      const modifiedCells = activeSheet.getModifiedCells();
-      const response = await axios.post('/api/sheets', {
-        sheetId: activeSheet.id,
-        cells: modifiedCells
+      setIsTransitioning(true);
+      
+      // Update active sheet
+      setActiveSheet(sheet);
+      
+      // Save to backend
+      const response = await fetch('/api/sheets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sheet.getId() })
       });
 
-      if (response.data.success) {
-        activeSheet.clearModifiedCells();
-        return response.data.data?.cells[cellId] || null;
+      if (!response.ok) {
+        throw new Error('Failed to switch sheet');
+      }
+    } catch (error) {
+      console.error('Failed to switch sheet:', error);
+    } finally {
+      setIsTransitioning(false);
+    }
+  }, [isTransitioning]);
+
+  const updateCell = useCallback(async (id: string, data: Partial<CellData>): Promise<void> => {
+    if (!activeSheet || isTransitioning) return;
+    
+    try {
+      setIsTransitioning(true);
+      
+      // Update cell
+      activeSheet.setCell(id, data);
+      
+      // Save to backend
+      const response = await fetch(`/api/sheets/${activeSheet.getId()}/cells/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update cell');
       }
     } catch (error) {
       console.error('Failed to update cell:', error);
+    } finally {
+      setIsTransitioning(false);
     }
-    return null;
+  }, [activeSheet, isTransitioning]);
+
+  const value = {
+    app,
+    activeSheet,
+    sheets,
+    activeCell,
+    selection,
+    isTransitioning,
+    addSheet,
+    switchSheet,
+    updateCell,
+    setActiveCell,
+    setSelection
   };
 
-  // Auto-save modified cells periodically
-  useEffect(() => {
-    const saveInterval = setInterval(async () => {
-      if (activeSheet) {
-        const modifiedCells = activeSheet.getModifiedCells();
-        if (Object.keys(modifiedCells).length > 0) {
-          try {
-            await axios.post('/api/sheets', {
-              sheetId: activeSheet.id,
-              cells: modifiedCells
-            });
-            activeSheet.clearModifiedCells();
-          } catch (error) {
-            console.error('Failed to auto-save cells:', error);
-          }
-        }
-      }
-    }, 5000); // Save every 5 seconds if there are modifications
-
-    return () => clearInterval(saveInterval);
-  }, [activeSheet]);
-
   return (
-    <SpreadsheetContext.Provider
-      value={{
-        activeCell,
-        setActiveCell,
-        activeSheet,
-        setActiveSheet,
-        updateCell,
-        spreadsheet,
-        addSheet,
-        selection,
-        setSelection,
-        application: Application.getInstance(),
-      }}
-    >
+    <SpreadsheetContext.Provider value={value}>
       {children}
     </SpreadsheetContext.Provider>
   );
-}
-
-export function useSpreadsheetContext() {
-  const context = useContext(SpreadsheetContext);
-  if (!context) {
-    throw new Error('useSpreadsheetContext must be used within SpreadsheetProvider');
-  }
-  return context;
 }

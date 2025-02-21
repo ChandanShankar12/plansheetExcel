@@ -31,14 +31,14 @@ export class Application {
 
   toJSON() {
     return {
-      workbook: this.workbook?.toJSON()
+      workbook: this.workbook.toJSON()
     };
   }
 
   static fromJSON(data: any): void {
     const app = Application.getInstance();
     if (data.workbook) {
-      app.workbook = Workbook.fromJSON(data.workbook);
+      Workbook.fromJSON(data.workbook);
     }
   }
 }

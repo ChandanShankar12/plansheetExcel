@@ -1,11 +1,16 @@
+import { Workbook } from '../models/workbook';
 import { WorkbookService } from '../services/workbook.service';
+import { CacheService } from '../services/cache.service';
+import { UserConfig } from '../models/workbook';
 
 export class WorkbookController {
   private static instance: WorkbookController | null = null;
   private workbookService: WorkbookService;
+  private cacheService: CacheService;
 
   private constructor() {
     this.workbookService = WorkbookService.getInstance();
+    this.cacheService = CacheService.getInstance();
   }
 
   static getInstance(): WorkbookController {
@@ -15,7 +20,7 @@ export class WorkbookController {
     return WorkbookController.instance;
   }
 
-  async getWorkbook() {
+  getWorkbook(): Workbook {
     try {
       return this.workbookService.getWorkbook();
     } catch (error) {

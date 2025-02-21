@@ -3,7 +3,7 @@ import { Cell } from "./cell";
 
 export class Sheet {
   private cells: Map<string, Cell> = new Map();
-  private modifiedCells: Set<string> = new Set();
+  private nonEmptyCellIds: Set<string> = new Set();
 
   constructor(
     public readonly id: number,
@@ -11,7 +11,7 @@ export class Sheet {
     private workbookId: string
   ) {}
 
-  // Cell management methods
+  // Improved cell management
   getCell(cellId: string): Cell {
     if (!this.cells.has(cellId)) {
       const [col, row] = this.parseCellId(cellId);
@@ -34,13 +34,16 @@ export class Sheet {
   setCellValue(cellId: string, value: any): void {
     const cell = this.getCell(cellId);
     cell.setValue(value);
-    this.markCellAsModified(cellId);
+    if (value) {
+      this.nonEmptyCellIds.add(cellId);
+    } else {
+      this.nonEmptyCellIds.delete(cellId);
+    }
   }
 
   setCellFormula(cellId: string, formula: string): void {
     const cell = this.getCell(cellId);
     cell.setFormula(formula);
-    this.markCellAsModified(cellId);
   }
 
   // Sheet management methods
@@ -58,27 +61,26 @@ export class Sheet {
 
   // Cell collection methods
   getAllCells(): Map<string, Cell> {
-    return new Map(this.cells);
+    return this.cells;
   }
 
-  markCellAsModified(cellId: string): void {
-    this.modifiedCells.add(cellId);
-  }
-
-  getModifiedCells(): Record<string, any> {
-    const modified: Record<string, any> = {};
-    this.modifiedCells.forEach(cellId => {
-      const cell = this.cells.get(cellId);
-      if (cell) {
-        modified[cellId] = cell.toJSON();
+  getCellsData(): Record<string, any> {
+    const data: Record<string, any> = {};
+    this.cells.forEach((cell, cellId) => {
+      const value = cell.getValue();
+      if (value !== undefined && value !== '') {
+        data[cellId] = {
+          value: cell.getValue(),
+          formula: cell.getFormula(),
+          style: cell.style
+        };
       }
     });
-    return modified;
+    return data;
   }
 
-  clearModifiedCells(): void {
-    this.modifiedCells.clear();
-    this.cells.forEach(cell => cell.clearModified());
+  getNonEmptyCellIds(): string[] {
+    return Array.from(this.nonEmptyCellIds);
   }
 
   // Utility methods
@@ -92,19 +94,23 @@ export class Sheet {
 
   clearCells(): void {
     this.cells.clear();
-    this.modifiedCells.clear();
+    this.nonEmptyCellIds.clear();
   }
 
   // Serialization methods
   toJSON() {
+    const nonEmptyCells = Array.from(this.cells.entries())
+      .filter(([cellId]) => this.nonEmptyCellIds.has(cellId))
+      .map(([key, cell]) => ({
+        key,
+        cell: cell.toJSON()
+      }));
+
     return {
       id: this.id,
       name: this.name,
       workbookId: this.workbookId,
-      cells: Array.from(this.cells.entries()).map(([key, cell]) => ({
-        key,
-        cell: cell.toJSON()
-      }))
+      cells: nonEmptyCells
     };
   }
 

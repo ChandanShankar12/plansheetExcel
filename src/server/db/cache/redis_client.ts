@@ -1,41 +1,63 @@
-import { Redis } from 'ioredis';
+import { createClient } from 'redis';
 
-// Prevent multiple Redis instances during development hot reloading
-const globalForRedis = global as unknown as {
-  redis: Redis | undefined;
-};
-
-// Get Redis URL from environment variables with fallback
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-
-// Create Redis client with error handling
-export const redis = globalForRedis.redis || 
-  new Redis(REDIS_URL, {
-    retryStrategy(times) {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    },
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true,
-    connectTimeout: 10000,
-    lazyConnect: true, // Only connect when needed
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForRedis.redis = redis;
+// Define global type for Redis client
+declare global {
+  var redis: ReturnType<typeof createClient> | undefined;
 }
 
-// Handle Redis connection events
-redis.on('connect', () => {
-  console.log('Connected to Redis');
-});
+// Check required environment variables
+const requiredEnvVars = ['REDIS_USERNAME', 'REDIS_PASSWORD', 'REDIS_HOST', 'REDIS_PORT'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`${envVar} is not defined in environment variables`);
+  }
+}
 
-redis.on('error', (error) => {
-  console.error('Redis connection error:', error);
-});
+// Create Redis client if it doesn't exist
+if (!global.redis) {
+  global.redis = createClient({
+    username: process.env.REDIS_USERNAME,
+    password: process.env.REDIS_PASSWORD,
+    socket: {
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT),
+      reconnectStrategy: (retries) => {
+        if (retries > 20) {
+          return new Error('Max reconnection attempts reached');
+        }
+        return Math.min(retries * 100, 3000);
+      }
+    }
+  });
 
-redis.on('close', () => {
-  console.warn('Redis connection closed');
-});
+  // Handle Redis events
+  global.redis.on('connect', () => {
+    console.log('Redis client connected');
+  });
 
+  global.redis.on('error', (error) => {
+    console.error('Redis client error:', error);
+  });
+
+  global.redis.on('reconnecting', () => {
+    console.log('Redis client reconnecting...');
+  });
+
+  // Connect to Redis
+  global.redis.connect().catch((err) => {
+    console.error('Failed to connect to Redis:', err);
+  });
+
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    global.redis?.quit().catch(console.error);
+  });
+
+  process.on('SIGINT', () => {
+    global.redis?.quit().catch(console.error);
+  });
+}
+
+// Export the singleton Redis client
+export const redis = global.redis;
 

@@ -1,134 +1,94 @@
 'use client';
 
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
-import { Sheet } from '@/server/models/sheets';
-import { useState, useEffect } from 'react';
+import { useSpreadsheet } from '@/context/spreadsheet-context';
+import { Sheet } from '@/server/models/sheet';
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function SheetsBar() {
-  const { spreadsheet, addSheet, activeSheet, setActiveSheet } = useSpreadsheetContext();
-  const [sheets, setSheets] = useState<Sheet[]>([]);
-  const [editingSheet, setEditingSheet] = useState<number | null>(null);
-  const [newSheetName, setNewSheetName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { 
+    sheets, 
+    activeSheet,
+    isTransitioning,
+    addSheet,
+    switchSheet
+  } = useSpreadsheet();
 
-  // Update sheets list when spreadsheet or active sheet changes
-  useEffect(() => {
-    if (spreadsheet) {
-      setSheets(spreadsheet.getAllSheets());
-    }
-  }, [spreadsheet, activeSheet]);
+  const [isAdding, setIsAdding] = useState(false);
 
   const handleAddSheet = async () => {
-    if (isLoading) return;
+    if (isTransitioning || isAdding) return;
     
-    setIsLoading(true);
     try {
+      setIsAdding(true);
       const newSheet = await addSheet();
-      if (newSheet) {
-        // Update local state immediately
-        setSheets(spreadsheet.getAllSheets());
-        // Switch to new sheet
-        setActiveSheet(newSheet);
+      if (!newSheet) {
+        throw new Error('Failed to create sheet');
       }
     } catch (error) {
-      console.error('Failed to add sheet:', error);
+      console.error('Error adding sheet:', error);
     } finally {
-      setIsLoading(false);
+      setIsAdding(false);
     }
   };
 
   const handleSheetClick = async (sheet: Sheet) => {
-    if (isLoading || sheet.id === activeSheet?.id) return;
-    
-    setIsLoading(true);
-    try {
-      await setActiveSheet(sheet);
-    } catch (error) {
-      console.error('Failed to switch sheet:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    if (isTransitioning || sheet.getId() === activeSheet?.getId()) return;
+    await switchSheet(sheet);
   };
-
-  const handleDoubleClick = (sheet: Sheet) => {
-    if (isLoading) return;
-    setEditingSheet(sheet.id);
-    setNewSheetName(sheet.name);
-  };
-
-  const handleNameChange = async (e: React.KeyboardEvent<HTMLInputElement>, sheet: Sheet) => {
-    if (e.key === 'Enter') {
-      const newName = newSheetName.trim();
-      if (newName && newName !== sheet.name && !isLoading) {
-        setIsLoading(true);
-        try {
-          await axios.post('/api/sheets', {
-            sheetId: sheet.id,
-            name: newName
-          });
-          
-          sheet.setName(newName);
-          setSheets([...sheets]); // Force re-render
-        } catch (error) {
-          console.error('Failed to rename sheet:', error);
-        } finally {
-          setIsLoading(false);
-          setEditingSheet(null);
-        }
-      } else {
-        setEditingSheet(null);
-      }
-    } else if (e.key === 'Escape') {
-      setEditingSheet(null);
-    }
-  };
-
-  if (!spreadsheet) return null;
 
   return (
-    <div className="flex items-center border-t border-gray-300 bg-gray-50 px-2 h-8">
-      <div className="flex-1 flex space-x-1 overflow-x-auto">
-        {sheets.map((sheet) => (
-          <div
-            key={sheet.id}
-            className={`
-              flex items-center px-3 py-1 rounded-sm cursor-pointer
-              ${sheet.id === activeSheet.id ? 'bg-white shadow' : 'hover:bg-gray-200'}
-            `}
-            onClick={() => handleSheetClick(sheet)}
-            onDoubleClick={() => handleDoubleClick(sheet)}
-          >
-            {editingSheet === sheet.id ? (
-              <input
-                value={newSheetName}
-                onChange={(e) => setNewSheetName(e.target.value)}
-                onKeyDown={(e) => handleNameChange(e, sheet)}
-                onBlur={() => setEditingSheet(null)}
-                className="w-full outline-none bg-transparent"
-                autoFocus
-                disabled={isLoading}
-              />
-            ) : (
-              <span className="text-sm">{sheet.name}</span>
-            )}
-          </div>
-        ))}
+    <div className="flex items-center h-[32px] border-t border-[#e1e3e6] bg-[#f8f9fa]">
+      <div className="flex items-center space-x-1 px-2">
+        <AnimatePresence mode="popLayout">
+          {sheets.map((sheet) => (
+            <motion.div
+              key={sheet.getId()}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              className={`
+                relative px-3 py-1 cursor-pointer rounded-t-md
+                ${sheet.getId() === activeSheet?.getId() ? 'bg-white' : 'hover:bg-gray-100'}
+                ${isTransitioning && sheet.getId() === activeSheet?.getId() ? 'opacity-50' : ''}
+              `}
+              onClick={() => handleSheetClick(sheet)}
+            >
+              <span className="text-[13px] text-[#333]">{sheet.getName()}</span>
+              {sheet.getId() === activeSheet?.getId() && (
+                <motion.div
+                  layoutId="activeIndicator"
+                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#1a73e8]"
+                />
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-      <button
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={handleAddSheet}
+        disabled={isTransitioning || isAdding}
         className={`
-          p-1 rounded-sm transition-colors
-          ${isLoading 
-            ? 'opacity-50 cursor-not-allowed' 
-            : 'hover:bg-gray-200 active:bg-gray-300'}
+          flex items-center justify-center w-8 h-8
+          hover:bg-[#e8f0fe] transition-colors rounded-full
+          ${(isTransitioning || isAdding) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
-        title="Add Sheet"
-        disabled={isLoading}
       >
-        <Plus className="w-4 h-4" />
-      </button>
+        {isAdding ? (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-4 h-4 border-2 border-[#1a73e8] border-t-transparent rounded-full"
+          />
+        ) : (
+          <Plus className="w-4 h-4 text-[#1a73e8]" />
+        )}
+      </motion.button>
     </div>
   );
 }

@@ -2,42 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Hide browser window scrollbar */
+/* Base styles */
 html, body {
-  overflow: hidden;
+  @apply overflow-hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
-  user-select: none;
+  @apply select-none box-border;
 }
 
-/* Custom scrollbar for grid */
+/* Scrollbar styles */
 .overflow-auto::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  @apply w-2 h-2;
 }
 
 .overflow-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  @apply bg-[#f1f1f1];
 }
 
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 0;
+  @apply bg-[#c1c1c1] border-2 border-[#f1f1f1] rounded;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  @apply bg-[#a8a8a8];
 }
 
-:root {
-  --radius: 0.5rem;
+.overflow-auto::-webkit-scrollbar-corner {
+  @apply bg-[#f1f1f1];
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Grid styles */
+.grid-container {
+  @apply relative min-w-max h-full bg-white;
+  contain: strict;
+  contain-intrinsic-size: 1000px;
+}
+
+/* Selection styles */
+::selection {
+  @apply bg-[#e8f0fe];
+}
+
+/* Cell styles */
+.cell-selected {
+  @apply bg-[#e8f0fe] !important;
+}
+
+.cell-active {
+  @apply outline outline-1 outline-[#1a73e8] z-[2] !important;
+}
+
+/* Grid lines */
+.grid-lines {
+  background-image: 
+    linear-gradient(#e1e3e6 1px, transparent 1px),
+    linear-gradient(90deg, #e1e3e6 1px, transparent 1px);
+  background-size: 100px 24px;
+}
+
+/* Resize handles */
+.resize-handle {
+  @apply absolute opacity-0 hover:opacity-100 transition-opacity;
+}
+
+.resize-handle-col {
+  @apply resize-handle top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#1a73e8];
+}
+
+.resize-handle-row {
+  @apply resize-handle bottom-0 left-0 w-full h-1 cursor-row-resize hover:bg-[#1a73e8];
 }
 
 /* Add these cursor styles */
@@ -49,11 +84,22 @@ html, body {
   cursor: row-resize;
 }
 
-/* Resize handles */
-.resize-handle-col {
-  @apply absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-green-500 opacity-0 hover:opacity-100;
+/* Layout utilities */
+.min-h-0 {
+  min-height: 0;
 }
 
-.resize-handle-row {
-  @apply absolute bottom-0 left-0 w-full h-1 cursor-row-resize hover:bg-green-500 opacity-0 hover:opacity-100;
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Prevent layout shift */
+.shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Improve scrolling */
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }

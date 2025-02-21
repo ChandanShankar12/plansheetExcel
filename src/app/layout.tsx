@@ -2,7 +2,7 @@ import './globals.css';
 import '@/styles/fonts.css';
 import localFont from 'next/font/local';
 import type { Metadata } from 'next';
-import { TitleBar } from '../components/TitleBar/TitleBar';
+import { TitleBar } from '@/components/TitleBar/TitleBar';
 import { SpreadsheetProvider } from '@/context/spreadsheet-context';
 
 
@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable}`}>
+    <html lang="en" className={inter.variable}>
       <head>
         <link
           rel="preload"
@@ -60,14 +60,14 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="h-screen w-screen">
+      <body className="h-screen w-screen overflow-hidden bg-white">
         <SpreadsheetProvider>
-          <main className="flex flex-col h-screen w-screen">
-            <TitleBar />
-            <div className="flex-1">
+          <div className="flex flex-col h-screen min-h-0">
+            <TitleBar className="shrink-0" />
+            <div className="flex-1 min-h-0 overflow-hidden">
               {children}
             </div>
-          </main>
+          </div>
         </SpreadsheetProvider>
       </body>
     </html>

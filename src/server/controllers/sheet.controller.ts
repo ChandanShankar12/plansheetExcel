@@ -1,11 +1,15 @@
 import { SheetService } from '../services/sheet.service';
+import { CacheService } from '../services/cache.service';
+import { Workbook } from '@/server/models/workbook';
 
 export class SheetController {
   private static instance: SheetController | null = null;
   private sheetService: SheetService;
+  private cacheService: CacheService;
 
   private constructor() {
     this.sheetService = SheetService.getInstance();
+    this.cacheService = CacheService.getInstance();
   }
 
   static getInstance(): SheetController {
@@ -65,9 +69,42 @@ export class SheetController {
 
   async setName(sheetId: number, name: string) {
     try {
-      return this.sheetService.setName(sheetId, name);
+      const result = await this.sheetService.setName(sheetId, name);
+      
+      // Update cache
+      const workbook = Workbook.getInstance();
+      const sheet = workbook.getSheet(sheetId);
+      if (sheet) {
+        await this.cacheService.setWithExpiry(
+          this.cacheService.generateSheetKey(workbook.getId(), sheetId),
+          sheet.toJSON()
+        );
+      }
+      
+      return result;
     } catch (error) {
       throw new Error('Failed to set sheet name');
+    }
+  }
+
+  async addSheet(name: string) {
+    try {
+      const workbook = Workbook.getInstance();
+      
+      // Create new sheet
+      const newSheet = workbook.addSheet(name);
+      
+      // Save to cache
+      await this.cacheService.setSheet(
+        workbook.getId(),
+        newSheet.id,
+        newSheet.toJSON()
+      );
+
+      return newSheet;
+    } catch (error) {
+      console.error('Failed to add sheet:', error);
+      throw error;
     }
   }
 } 

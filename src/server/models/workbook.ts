@@ -1,4 +1,4 @@
-import { Sheet } from './sheets';
+import { Sheet } from './sheet';
 
 export interface UserConfig {
   theme: 'light' | 'dark';
@@ -11,13 +11,15 @@ export interface UserConfig {
 
 export class Workbook {
   private static instance: Workbook | null = null;
-  private sheets: Sheet[] = [];
+  private sheets: Sheet[];
   private readonly id: string;
   private config: UserConfig;
+  private nextSheetId: number;
 
   private constructor() {
     this.id = crypto.randomUUID();
-    this.sheets.push(new Sheet(0, 'Sheet1', this.id));
+    this.sheets = [];
+    this.nextSheetId = 1;
     this.config = {
       theme: 'light',
       language: 'en',
@@ -44,13 +46,17 @@ export class Workbook {
   }
 
   addSheet(name: string): Sheet {
-    const newSheet = new Sheet(this.sheets.length, name, this.id);
-    this.sheets.push(newSheet);
-    return newSheet;
+    const sheet = new Sheet(this.nextSheetId++, name);
+    this.sheets.push(sheet);
+    return sheet;
   }
 
   getSheet(id: number): Sheet | undefined {
-    return this.sheets.find(sheet => sheet.id === id);
+    return this.sheets.find(sheet => sheet.getId() === id);
+  }
+
+  removeSheet(id: number): void {
+    this.sheets = this.sheets.filter(sheet => sheet.getId() !== id);
   }
 
   // Config methods
@@ -105,10 +111,7 @@ export class Workbook {
   }
 
   static fromJSON(data: any): Workbook {
-    if (!Workbook.instance) {
-      Workbook.instance = new Workbook();
-    }
-    const workbook = Workbook.instance;
+    const workbook = Workbook.getInstance();
     workbook.sheets = data.sheets.map((sheetData: any) => Sheet.fromJSON(sheetData));
     workbook.config = {
       ...data.config,

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { CellData } from '@/lib/spreadsheet/types';
+import { CellStyle } from '@/server/models/cell';
 import { ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 // import {FontTools} from '@/components/spreadsheet/toolbar/font-tools';
@@ -12,19 +12,9 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSpreadsheetContext } from '@/context/spreadsheet-context';
+import { useSpreadsheet } from '@/context/spreadsheet-context';
 // import { FontSelector } from './font-selector';
 
-interface ToolbarProps {
-  activeCell: string | null;
-  data: Record<string, CellData>;
-  setData: (
-    data:
-      | Record<string, CellData>
-      | ((prev: Record<string, CellData>) => Record<string, CellData>)
-  ) => void;
-  setFont: {};
-}
 
 export const Divider = () => (
   <div className="flex flex-row w-full">
@@ -33,33 +23,24 @@ export const Divider = () => (
 );
 
 export function Toolbar() {
-  const { activeCell, data, updateCell, activeSheetId } = useSpreadsheetContext();
-  
-  const handleFontChange = (fontFamily: string) => {
-    if (activeCell) {
-      const cellKey = `${activeSheetId}_${activeCell}`;
-      const currentCell = data[cellKey];
-      updateCell(cellKey, {
-        ...currentCell,
-        style: {
-          ...currentCell?.style,
-          fontFamily
-        }
-      });
-    }
-  };
+  const { 
+    activeCell, 
+    activeSheet,
+    updateCell 
+  } = useSpreadsheet();
 
-  // const getCurrentFont = () => {
-  //   if (activeCell) {
-  //     const cellKey = `${activeSheetId}_${activeCell}`;
-  //     return data[cellKey]?.style?.fontFamily || FONT_FAMILIES[0].value;
-  //   }
-  //   return FONT_FAMILIES[0].value;
-  // };
-
+  const [formulaValue, setFormulaValue] = useState('');
   const [isOverflowing, setIsOverflowing] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+
+
+  const handleFormulaChange = (value: string) => {
+    setFormulaValue(value);
+  };
+
+  
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -72,18 +53,6 @@ export function Toolbar() {
     window.addEventListener('resize', checkOverflow);
     return () => window.removeEventListener('resize', checkOverflow);
   }, []);
-
-  const handleFormulaChange = (value: string) => {
-    if (activeCell) {
-      setData((prev) => ({
-        ...prev,
-        [activeCell]: {
-          value,
-          style: prev[activeCell]?.style || {},
-        },
-      }));
-    }
-  };
 
   const toolbarContent = (inDropdown = false) => (
     <div ref={!inDropdown ? contentRef : undefined} className="flex h-[48px] flex-row justify-between items-center rounded-l-[6px] border-gray-300 border w-full px-2 gap-4">
@@ -176,7 +145,18 @@ export function Toolbar() {
       {/* 5th group - Formula */}
       <div className="flex items-center justify-center gap-1 w-full ">
         <div className="relative items-center">
-          <Input className="h-8 w-42 sm:w-42 pl-8 pr-2" placeholder="Formula" />
+          <Input 
+            className="h-8 w-42 sm:w-42 pl-8 pr-2" 
+            placeholder="Formula" 
+            value={formulaValue}
+            onChange={(e) => handleFormulaChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+               
+              }
+            }}
+          />
           <div className="absolute left-2 top-1/2 -translate-y-1/2">
             <Image
               src="/Icons/Toolbar/16.svg"

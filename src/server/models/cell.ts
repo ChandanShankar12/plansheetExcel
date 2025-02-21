@@ -1,6 +1,16 @@
 // src/server/models/Cell.ts
 import { Sheet } from "./sheets";
-import { CellStyle } from "@/lib/types";
+
+export interface CellStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string;
+  backgroundColor?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  alignment?: 'left' | 'center' | 'right';
+}
 
 export class Cell {
   private value: any;

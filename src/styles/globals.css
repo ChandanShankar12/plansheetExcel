@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Grid styles */
+.grid-container {
+  position: relative;
+  min-width: max-content;
+  height: 100%;
+  background: white;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border: 3px solid #f1f1f1;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+
+/* Selection styles */
+::selection {
+  background: #e8f0fe;
+}
+
+/* Cell styles */
+.cell-selected {
+  background-color: #e8f0fe !important;
+}
+
+.cell-active {
+  outline: 1px solid #1a73e8 !important;
+  z-index: 2;
+}
+
+/* Grid lines */
+.grid-lines {
+  background-image: linear-gradient(#e1e3e6 1px, transparent 1px),
+    linear-gradient(90deg, #e1e3e6 1px, transparent 1px);
+  background-size: 100px 24px;
+}
+
+.cell {
+  min-width: 96px; /* w-24 */
+  height: 32px; /* h-8 */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.grid-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.grid-container {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+} 
