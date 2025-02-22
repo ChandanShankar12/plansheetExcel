@@ -1,44 +1,48 @@
 import { Workbook } from './workbook';
 
 export class Application {
-  private static instance: Application | null = null;
-  private workbook: Workbook;
+  private static _instance: Application;
+  private static _workbook: Workbook; // Make workbook static
 
   private constructor() {
-    this.workbook = Workbook.getInstance();
-  }
-
-  static getInstance(): Application {
-    if (!Application.instance) {
-      Application.instance = new Application();
-    }
-    return Application.instance;
-  }
-
-  getWorkbook(): Workbook {
-    return this.workbook;
-  }
-
-  getAllWorkbooks(): Workbook[] {
-    return [this.workbook];
-  }
-
-  removeWorkbook(id: string): void {
-    if (this.workbook?.getId() === id) {
-      this.workbook = Workbook.getInstance();
+    if (!Application._workbook) {
+      Application._workbook = new Workbook();
+      const initialSheet = Application._workbook.addSheet('Sheet 1');
+      console.log('Application initialized with sheet:', initialSheet.getId());
     }
   }
 
-  toJSON() {
+  public static get instance(): Application {
+    if (!Application._instance) {
+      Application._instance = new Application();
+    }
+    return Application._instance;
+  }
+
+  public getWorkbook(): Workbook {
+    return Application._workbook;
+  }
+
+  public setWorkbook(workbook: Workbook): void {
+    Application._workbook = workbook;
+    if (workbook.getSheets().length === 0) {
+      workbook.addSheet('Sheet 1');
+    }
+  }
+
+  public toJSON() {
     return {
-      workbook: this.workbook.toJSON()
+      workbook: Application._workbook.toJSON()
     };
   }
 
-  static fromJSON(data: any): void {
-    const app = Application.getInstance();
-    if (data.workbook) {
-      Workbook.fromJSON(data.workbook);
+  public static fromJSON(data: any): void {
+    if (!Application._instance) {
+      Application._instance = new Application();
+    }
+    if (data?.workbook) {
+      const workbook = Workbook.fromJSON(data.workbook);
+      Application._instance.setWorkbook(workbook);
     }
   }
 }

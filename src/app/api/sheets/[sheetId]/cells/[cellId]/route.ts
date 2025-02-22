@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CellController } from '@/server/controllers/cell.controller';
 import { Application } from '@/server/models/application';
-import { CellData } from '@/lib/types';
 
-const app = Application.getInstance();
+const cellController = CellController.instance;
+const app = Application.instance;
 
 // GET: Get a specific cell's value
 export async function GET(
@@ -11,21 +12,11 @@ export async function GET(
 ) {
   try {
     const sheetId = parseInt(params.sheetId);
-    const workbook = app.getWorkbook();
-    const sheet = workbook.getSheet(sheetId);
-
-    if (!sheet) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sheet not found'
-      }, { status: 404 });
-    }
-
-    const cellData = sheet.getCell(params.cellId);
+    const value = await cellController.getValue(sheetId, params.cellId);
 
     return NextResponse.json({
       success: true,
-      data: cellData
+      data: value
     });
   } catch (error) {
     console.error('Failed to get cell:', error);
@@ -36,25 +27,46 @@ export async function GET(
   }
 }
 
-// PATCH: Update a cell's value
-export async function PATCH(
+// POST: Update a cell's value
+export async function POST(
   req: NextRequest,
   { params }: { params: { sheetId: string; cellId: string } }
 ) {
   try {
+    const updates = await req.json();
     const sheetId = parseInt(params.sheetId);
+    
+    if (isNaN(sheetId)) {
+      console.error('Invalid sheet ID:', params.sheetId);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid sheet ID' 
+      }, { status: 400 });
+    }
+
     const workbook = app.getWorkbook();
     const sheet = workbook.getSheet(sheetId);
-
+    
     if (!sheet) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sheet not found'
+      const sheets = workbook.getSheets();
+      console.error(`Sheet not found: ${sheetId}. Available sheets:`, 
+        sheets.map(s => ({ id: s.getId(), name: s.getName() }))
+      );
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Sheet not found' 
       }, { status: 404 });
     }
 
-    const updates: Partial<CellData> = await req.json();
-    sheet.setCell(params.cellId, updates);
+    // Update the cell
+    sheet.setCell(params.cellId, {
+      ...updates,
+      isModified: true,
+      lastModified: new Date().toISOString()
+    });
+
+    // Cache the updated sheet
+    await cellController.setValue(sheetId, params.cellId, updates);
 
     return NextResponse.json({
       success: true,
@@ -76,19 +88,7 @@ export async function DELETE(
 ) {
   try {
     const sheetId = parseInt(params.sheetId);
-    const { cellId } = params;
-
-    const workbook = app.getWorkbook();
-    const sheet = workbook.getSheet(sheetId);
-
-    if (!sheet) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
-    }
-
-    await sheet.clearCell(cellId);
+    await cellController.clearCell(sheetId, params.cellId);
 
     return NextResponse.json({
       success: true

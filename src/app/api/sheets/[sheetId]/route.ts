@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Workbook } from '@/server/models/workbook';
 import { SheetController } from '@/server/controllers/sheet.controller';
-import { CellController } from '@/server/controllers/cell.controller';
-import { CacheService } from '@/server/services/cache.service';
 import { Application } from '@/server/models/application';
 
-const sheetController = SheetController.getInstance();
-const cellController = CellController.getInstance();
-const cacheService = CacheService.getInstance();
-const app = Application.getInstance();
-
-interface CellData {
-  value?: any;
-  formula?: string;
-}
+const sheetController = SheetController.instance;
+const app = Application.instance;
 
 export async function GET(
   req: NextRequest,
@@ -21,46 +11,24 @@ export async function GET(
 ) {
   try {
     const sheetId = parseInt(params.sheetId);
-    const workbook = Workbook.getInstance();
-    
-    // Try cache first
-    const cachedSheet = await cacheService.get(
-      cacheService.generateSheetKey(workbook.getId(), sheetId)
-    );
-
-    if (cachedSheet) {
-      return NextResponse.json({
-        success: true,
-        data: cachedSheet
-      });
-    }
-
-    // Fallback to workbook
-    const sheet = workbook.getSheet(sheetId);
-    if (!sheet) {
+    if (isNaN(sheetId)) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
+        error: 'Invalid sheet ID' 
+      }, { status: 400 });
     }
 
-    const sheetData = sheet.toJSON();
+    const sheet = await sheetController.getSheet(sheetId);
     
-    // Cache for future requests
-    await cacheService.setWithExpiry(
-      cacheService.generateSheetKey(workbook.getId(), sheetId),
-      sheetData
-    );
-
     return NextResponse.json({
       success: true,
-      data: sheetData
+      data: sheet.toJSON()
     });
   } catch (error) {
-    console.error('Sheet retrieval error:', error);
+    console.error('Failed to get sheet:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to fetch sheet' 
+      error: 'Failed to get sheet' 
     }, { status: 500 });
   }
 }
@@ -70,24 +38,8 @@ export async function DELETE(
   { params }: { params: { sheetId: string } }
 ) {
   try {
-    const sheetId = parseInt(params.sheetId);
-    const workbook = app.getWorkbook();
+    await sheetController.deleteSheet(params.sheetId);
     
-    // Check if sheet exists
-    const sheet = workbook.getSheet(sheetId);
-    if (!sheet) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
-    }
-
-    // Remove sheet
-    workbook.removeSheet(sheetId);
-    
-    // Clear sheet cache
-    await cacheService.deleteSheet(workbook.getId(), sheetId);
-
     return NextResponse.json({
       success: true
     });
@@ -105,28 +57,8 @@ export async function PATCH(
   { params }: { params: { sheetId: string } }
 ) {
   try {
-    const sheetId = parseInt(params.sheetId);
-    const { name } = await req.json();
-    
-    const workbook = app.getWorkbook();
-    const sheet = workbook.getSheet(sheetId);
-
-    if (!sheet) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
-    }
-
-    // Update sheet name
-    sheet.setName(name);
-    
-    // Update cache
-    await cacheService.setSheet(
-      workbook.getId(),
-      sheetId,
-      sheet.toJSON()
-    );
+    const updates = await req.json();
+    const sheet = await sheetController.updateSheet(params.sheetId, updates);
 
     return NextResponse.json({
       success: true,

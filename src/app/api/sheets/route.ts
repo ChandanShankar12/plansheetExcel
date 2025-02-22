@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SheetController } from '@/server/controllers/sheet.controller';
 import { Application } from '@/server/models/application';
-import { CacheService } from '@/server/services/cache.service';
 
-const cacheService = CacheService.getInstance();
-const app = Application.getInstance();
+const sheetController = SheetController.instance;
+const app = Application.instance;
 
 // Interface for cell updates
 interface CellData {
@@ -26,32 +26,16 @@ interface PatchRequestBody {
   sheets?: Record<string, SheetUpdates>;
 }
 
-/**
- * POST endpoint to create a new sheet
- */
+// POST: Create a new sheet
 export async function POST(req: NextRequest) {
   try {
     const { name } = await req.json();
-    const workbook = app.getWorkbook();
-    
-    if (workbook.getSheets().some(s => s.getName() === name)) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet with this name already exists' 
-      }, { status: 400 });
-    }
-
-    const newSheet = workbook.addSheet(name);
-    
-    await cacheService.setSheet(
-      workbook.getId(),
-      newSheet.getId(),
-      newSheet.toJSON()
-    );
+    const sheet = await sheetController.createSheet(name);
+    console.log('Sheet created:', sheet.getId());
 
     return NextResponse.json({
       success: true,
-      data: newSheet.toJSON()
+      data: sheet.toJSON()
     });
   } catch (error) {
     console.error('Failed to create sheet:', error);
@@ -65,12 +49,10 @@ export async function POST(req: NextRequest) {
 // GET: List all sheets
 export async function GET() {
   try {
-    const workbook = app.getWorkbook();
-    const sheets = workbook.getSheets().map(sheet => sheet.toJSON());
-    
+    const sheets = await sheetController.getAllSheets();
     return NextResponse.json({
       success: true,
-      data: sheets
+      data: sheets.map(sheet => sheet.toJSON())
     });
   } catch (error) {
     console.error('Failed to get sheets:', error);

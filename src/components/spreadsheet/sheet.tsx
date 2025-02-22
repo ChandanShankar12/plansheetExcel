@@ -70,7 +70,8 @@ export function Sheet() {
     activeCell,
     selection,
     setActiveCell,
-    setSelection
+    setSelection,
+    updateCell
   } = useSpreadsheet();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -98,6 +99,20 @@ export function Sheet() {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  const handleCellUpdate = async (id: string, value: any) => {
+    if (!activeSheet) return;
+    
+    try {
+      await updateCell(id, {
+        value,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to update cell:', error);
+    }
   };
 
   // Generate grid

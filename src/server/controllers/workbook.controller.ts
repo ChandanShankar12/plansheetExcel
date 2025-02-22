@@ -1,44 +1,62 @@
-import { Workbook } from '../models/workbook';
-import { WorkbookService } from '../services/workbook.service';
+import { Workbook, UserConfig } from '../models/workbook';
 import { CacheService } from '../services/cache.service';
-import { UserConfig } from '../models/workbook';
+import { Application } from '../models/application';
 
 export class WorkbookController {
-  private static instance: WorkbookController | null = null;
-  private workbookService: WorkbookService;
-  private cacheService: CacheService;
+  private static _instance: WorkbookController;
+  private readonly cacheService: CacheService;
+  private readonly application: Application;
 
   private constructor() {
-    this.workbookService = WorkbookService.getInstance();
-    this.cacheService = CacheService.getInstance();
+    this.cacheService = CacheService.instance;
+    this.application = Application.instance;
   }
 
-  static getInstance(): WorkbookController {
-    if (!WorkbookController.instance) {
-      WorkbookController.instance = new WorkbookController();
+  public static get instance(): WorkbookController {
+    if (!WorkbookController._instance) {
+      WorkbookController._instance = new WorkbookController();
     }
-    return WorkbookController.instance;
+    return WorkbookController._instance;
   }
 
   getWorkbook(): Workbook {
-    try {
-      return this.workbookService.getWorkbook();
-    } catch (error) {
-      throw new Error('Failed to get workbook');
-    }
+    return this.application.getWorkbook();
   }
 
   async addSheet(name: string) {
     try {
-      return this.workbookService.addSheet(name);
+      const workbook = this.application.getWorkbook();
+      const sheet = workbook.addSheet(name);
+      
+      // Cache the new sheet
+      await this.cacheService.cacheSheet(
+        workbook.getId(),
+        sheet.getId(),
+        sheet.toJSON()
+      );
+      
+      return sheet;
     } catch (error) {
       throw new Error('Failed to add sheet');
     }
   }
 
-  async updateSheetName(sheetId: number, name: string) {
+  async updateSheetName(sheetName: string, name: string) {
     try {
-      return this.workbookService.updateSheetName(sheetId, name);
+      const workbook = this.application.getWorkbook();
+      const sheet = workbook.getSheetByName(sheetName);
+      if (!sheet) throw new Error('Sheet not found');
+      
+      sheet.setName(name);
+      
+      // Cache the updated sheet
+      await this.cacheService.cacheSheet(
+        workbook.getId(),
+        sheet.getId(),
+        sheet.toJSON()
+      );
+      
+      return sheet;
     } catch (error) {
       throw new Error('Failed to update sheet name');
     }
@@ -46,9 +64,30 @@ export class WorkbookController {
 
   async updateConfig(config: Partial<UserConfig>) {
     try {
-      return this.workbookService.updateConfig(config);
+      const workbook = this.application.getWorkbook();
+      workbook.updateConfig(config);
+      
+      // Cache the updated workbook config
+      await this.cacheService.cacheSheet(
+        workbook.getId(),
+        0,
+        workbook.toJSON()
+      );
     } catch (error) {
       throw new Error('Failed to update config');
+    }
+  }
+
+  async saveWorkbook(): Promise<void> {
+    try {
+      const workbook = this.application.getWorkbook();
+      await this.cacheService.cacheSheet(
+        workbook.getId(),
+        0,
+        workbook.toJSON()
+      );
+    } catch (error) {
+      throw new Error('Failed to save workbook');
     }
   }
 } 

@@ -39,26 +39,25 @@ export const useSpreadsheet = () => {
 export const useSpreadsheetContext = useSpreadsheet;
 
 export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
-  // Initialize core application
-  const [app] = useState(() => Application.getInstance());
+  // Initialize with singleton Application instance
+  const [app] = useState(() => Application.instance);
   
-  // Initialize sheets state
-  const [sheets, setSheets] = useState(() => {
-    const workbook = app.getWorkbook();
-    const existingSheets = workbook.getSheets();
-    if (existingSheets.length === 0) {
-      return [workbook.addSheet('Sheet 1')];
-    }
+  // Get sheets from workbook and maintain reference
+  const [sheets, setSheets] = useState<Sheet[]>(() => {
+    const existingSheets = app.getWorkbook().getSheets();
+    console.log('Initial sheets:', existingSheets.map(s => ({
+      id: s.getId(),
+      name: s.getName()
+    })));
     return existingSheets;
   });
-
-  // UI state
-  const [activeSheet, setActiveSheet] = useState<Sheet | null>(() => sheets[0] || null);
-  const [activeCell, setActiveCell] = useState<string | null>(null);
-  const [selection, setSelection] = useState<Selection>(null);
+  
+  // First sheet is always active initially
+  const [activeSheet, setActiveSheet] = useState<Sheet | null>(() => sheets[0]);
+  
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Sheet operations
+  // Add new sheet to existing workbook
   const addSheet = useCallback(async (name?: string): Promise<Sheet | null> => {
     if (isTransitioning) return null;
     
@@ -66,27 +65,37 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       setIsTransitioning(true);
       const workbook = app.getWorkbook();
       
-      // Generate sheet name if not provided
       const sheetName = name || `Sheet ${sheets.length + 1}`;
-      
-      // Create sheet
       const newSheet = workbook.addSheet(sheetName);
+      console.log('Adding new sheet:', newSheet.getId());
       
-      // Save to backend
+      // Save to backend first
       const response = await fetch('/api/sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: sheetName })
+        body: JSON.stringify({ 
+          id: newSheet.getId(),
+          name: sheetName,
+          workbookId: workbook.getId()
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create sheet');
+        throw new Error('Failed to save sheet');
       }
 
-      // Update state
-      // setSheets(prev => [...prev, newSheet]);
+      // Then update local state
+      setSheets(prev => {
+        const updated = [...prev, newSheet];
+        console.log('Updated sheets:', updated.map(s => ({
+          id: s.getId(),
+          name: s.getName()
+        })));
+        return updated;
+      });
+
+      // Switch to new sheet
       await switchSheet(newSheet);
-      
       return newSheet;
     } catch (error) {
       console.error('Failed to add sheet:', error);
@@ -96,62 +105,81 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     }
   }, [app, sheets.length, isTransitioning]);
 
+  // Switch between sheets in workbook
   const switchSheet = useCallback(async (sheet: Sheet): Promise<void> => {
-    if (isTransitioning) return;
+    if (isTransitioning || !sheets.includes(sheet)) return;
     
     try {
       setIsTransitioning(true);
       
-      // Update active sheet
-      setActiveSheet(sheet);
+      // Load sheet data first
+      const response = await fetch(`/api/sheets/${sheet.getId()}`);
+      if (!response.ok) throw new Error('Failed to load sheet');
       
-      // Save to backend
-      const response = await fetch('/api/sheets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: sheet.getId() })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to switch sheet');
+      const { data } = await response.json();
+      if (data.cells) {
+        Object.entries(data.cells).forEach(([cellId, cellData]) => {
+          sheet.setCell(cellId, cellData as CellData);
+        });
       }
+
+      // Then update active sheet
+      setActiveSheet(sheet);
     } catch (error) {
       console.error('Failed to switch sheet:', error);
     } finally {
       setIsTransitioning(false);
     }
-  }, [isTransitioning]);
+  }, [sheets, isTransitioning]);
+
+  const [activeCell, setActiveCell] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
 
   const updateCell = useCallback(async (id: string, data: Partial<CellData>): Promise<void> => {
     if (!activeSheet || isTransitioning) return;
-    
+
     try {
-      setIsTransitioning(true);
-      
-      // Update cell
-      activeSheet.setCell(id, data);
-      
-      // Save to backend
+      // Update cell in workbook first
+      activeSheet.setCell(id, {
+        value: data.value,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      });
+
+      console.log('Updating cell in sheet:', activeSheet.getId(), 'Total sheets:', sheets.length);
+
+      // Send to backend for caching
       const response = await fetch(`/api/sheets/${activeSheet.getId()}/cells/${id}`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          value: data.value,
+          isModified: true,
+          lastModified: new Date().toISOString()
+        })
       });
 
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Cell update failed:', errorData);
         throw new Error('Failed to update cell');
+      }
+
+      // Update with confirmed data from backend
+      const result = await response.json();
+      if (result.success && activeSheet) {
+        activeSheet.setCell(id, result.data);
       }
     } catch (error) {
       console.error('Failed to update cell:', error);
-    } finally {
-      setIsTransitioning(false);
+      throw error;
     }
-  }, [activeSheet, isTransitioning]);
+  }, [activeSheet, isTransitioning, sheets.length]);
 
   const value = {
     app,
-    activeSheet,
     sheets,
+    activeSheet,
     activeCell,
     selection,
     isTransitioning,

@@ -1,83 +1,76 @@
-import { CellService } from '../services/cell.service';
-import { CellStyle } from '../models/cell';
 import { CacheService } from '../services/cache.service';
-import { Workbook } from '../models/workbook';
+import { Application } from '../models/application';
+import { CellData } from '@/lib/types';
+import { Cell } from '../models/cell';
 
 export class CellController {
-  private static instance: CellController | null = null;
-  private cellService: CellService;
-  private cacheService: CacheService;
+  private static _instance: CellController;
+  private readonly cacheService: CacheService;
+  private readonly application: Application;
 
   private constructor() {
-    this.cellService = CellService.getInstance();
-    this.cacheService = CacheService.getInstance();
+    this.cacheService = CacheService.instance;
+    this.application = Application.instance;
   }
 
-  static getInstance(): CellController {
-    if (!CellController.instance) {
-      CellController.instance = new CellController();
+  public static get instance(): CellController {
+    if (!CellController._instance) {
+      CellController._instance = new CellController();
     }
-    return CellController.instance;
+    return CellController._instance;
   }
 
-  async getValue(sheetId: number, cellId: string) {
-    try {
-      return this.cellService.getValue(sheetId, cellId);
-    } catch (error) {
-      throw new Error('Failed to get cell value');
-    }
+  async getValue(sheetId: number, cellId: string): Promise<CellData> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheet(sheetId);
+    if (!sheet) throw new Error('Sheet not found');
+    
+    return sheet.getCell(cellId);
   }
 
-  async setValue(sheetId: number, cellId: string, value: any) {
-    try {
-      // Update cell in service
-      await this.cellService.setValue(sheetId, cellId, value);
+  async setValue(sheetId: number, cellId: string, data: CellData): Promise<void> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheet(sheetId);
+    if (!sheet) throw new Error('Sheet not found');
 
-      // Get workbook and sheet for caching
-      const workbook = Workbook.getInstance();
-      const sheet = workbook.getSheet(sheetId);
-      
-      if (!sheet) throw new Error('Sheet not found');
-
-      // Cache updates at all levels using public methods
-      await Promise.all([
-        this.cacheService.setCell(
-          workbook.getId(),
-          sheetId,
-          cellId,
-          sheet.getCell(cellId).toJSON()
-        ),
-        this.cacheService.setSheet(
-          workbook.getId(),
-          sheetId,
-          sheet.toJSON()
-        ),
-        this.cacheService.setWorkbook(
-          workbook.getId(),
-          workbook.toJSON()
-        )
-      ]);
-
-      return true;
-    } catch (error) {
-      console.error('Failed to set cell value:', error);
-      throw error;
-    }
+    // Create or update cell
+    const [row, col] = this.parseCellId(cellId);
+    const cell = new Cell(sheetId, row, col);
+    cell.setValue(data.value);
+    
+    // Update sheet with new cell
+    sheet.setCell(cellId, {
+      value: data.value,
+      isModified: true,
+      lastModified: new Date().toISOString()
+    });
+    
+    // Cache the updated sheet
+    await this.cacheService.cacheSheet(
+      workbook.getId(),
+      sheetId,
+      sheet.toJSON()
+    );
   }
 
-  async setFormula(sheetId: number, cellId: string, formula: string) {
-    try {
-      return this.cellService.setFormula(sheetId, cellId, formula);
-    } catch (error) {
-      throw new Error('Failed to set formula');
-    }
+  async clearCell(sheetId: number, cellId: string): Promise<void> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheet(sheetId);
+    if (!sheet) throw new Error('Sheet not found');
+    
+    sheet.clearCell(cellId);
+    
+    // Cache the updated sheet
+    await this.cacheService.cacheSheet(
+      workbook.getId(),
+      sheetId,
+      sheet.toJSON()
+    );
   }
 
-  async setStyle(sheetId: number, cellId: string, style: Partial<CellStyle>) {
-    try {
-      return this.cellService.setStyle(sheetId, cellId, style);
-    } catch (error) {
-      throw new Error('Failed to set cell style');
-    }
+  private parseCellId(cellId: string): [number, string] {
+    const col = cellId.match(/[A-Z]+/)?.[0] || '';
+    const row = parseInt(cellId.match(/\d+/)?.[0] || '0');
+    return [row, col];
   }
 } 

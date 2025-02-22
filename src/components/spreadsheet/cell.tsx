@@ -50,7 +50,11 @@ export function Cell({
     if (!isEditing) return;
     
     try {
-      await handleChange(value);
+      await updateCell(id, {
+        value,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Failed to update cell:', error);
     } finally {

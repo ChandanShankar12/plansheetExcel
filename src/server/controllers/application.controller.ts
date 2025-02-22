@@ -1,12 +1,15 @@
-import { ApplicationService } from '../services/application.service';
+import { Application } from '../models/application';
+import { CacheService } from '../services/cache.service';
 import { Workbook } from '../models/workbook';
 
 export class ApplicationController {
   private static instance: ApplicationController | null = null;
-  private applicationService: ApplicationService;
+  private application: Application;
+  private cacheService: CacheService;
 
   private constructor() {
-    this.applicationService = ApplicationService.getInstance();
+    this.application = Application.getInstance();
+    this.cacheService = CacheService.getInstance();
   }
 
   static getInstance(): ApplicationController {
@@ -16,17 +19,17 @@ export class ApplicationController {
     return ApplicationController.instance;
   }
 
-  async getCurrentWorkbook(): Promise<Workbook> {
+  getCurrentWorkbook(): Workbook {
     try {
-      return this.applicationService.getCurrentWorkbook();
+      return this.application.getWorkbook();
     } catch (error) {
       throw new Error('Failed to get current workbook');
     }
   }
 
-  async getAllWorkbooks(): Promise<Workbook[]> {
+  getAllWorkbooks(): Workbook[] {
     try {
-      return this.applicationService.getAllWorkbooks();
+      return this.application.getAllWorkbooks();
     } catch (error) {
       throw new Error('Failed to get all workbooks');
     }
@@ -34,7 +37,8 @@ export class ApplicationController {
 
   async removeWorkbook(id: string): Promise<void> {
     try {
-      return this.applicationService.removeWorkbook(id);
+      this.application.removeWorkbook(id);
+      await this.cacheService.clearWorkbookCache(id);
     } catch (error) {
       throw new Error('Failed to remove workbook');
     }
@@ -42,7 +46,14 @@ export class ApplicationController {
 
   async saveApplicationState(): Promise<string> {
     try {
-      return this.applicationService.saveApplicationState();
+      const state = this.application.toJSON();
+      const workbook = this.application.getWorkbook();
+      await this.cacheService.cacheSheet(
+        workbook.getId(),
+        0,
+        state
+      );
+      return JSON.stringify(state);
     } catch (error) {
       throw new Error('Failed to save application state');
     }
@@ -50,7 +61,8 @@ export class ApplicationController {
 
   async loadApplicationState(state: string): Promise<void> {
     try {
-      return this.applicationService.loadApplicationState(state);
+      const parsedState = JSON.parse(state);
+      Application.fromJSON(parsedState);
     } catch (error) {
       throw new Error('Failed to load application state');
     }

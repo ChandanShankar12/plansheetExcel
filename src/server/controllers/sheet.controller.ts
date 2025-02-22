@@ -1,110 +1,106 @@
-import { SheetService } from '../services/sheet.service';
 import { CacheService } from '../services/cache.service';
-import { Workbook } from '@/server/models/workbook';
+import { Application } from '../models/application';
+import { Sheet } from '../models/sheet';
+import { SheetData } from '@/lib/types';
+import { CellData } from '@/lib/types';
 
 export class SheetController {
-  private static instance: SheetController | null = null;
-  private sheetService: SheetService;
-  private cacheService: CacheService;
+  private static _instance: SheetController;
+  private readonly cacheService: CacheService;
+  private readonly application: Application;
 
   private constructor() {
-    this.sheetService = SheetService.getInstance();
-    this.cacheService = CacheService.getInstance();
+    this.cacheService = CacheService.instance;
+    this.application = Application.instance;
   }
 
-  static getInstance(): SheetController {
-    if (!SheetController.instance) {
-      SheetController.instance = new SheetController();
+  public static get instance(): SheetController {
+    if (!SheetController._instance) {
+      SheetController._instance = new SheetController();
     }
-    return SheetController.instance;
+    return SheetController._instance;
   }
 
-  async getSheet(sheetId: number) {
-    try {
-      return this.sheetService.getSheet(sheetId);
-    } catch (error) {
-      throw new Error('Failed to get sheet');
+  async createSheet(name: string): Promise<Sheet> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.addSheet(name);
+    console.log('Creating sheet in controller:', sheet.getId(), sheet.getName());
+    
+    // Cache the new sheet
+    await this.cacheService.cacheSheet(
+      workbook.getId(),
+      sheet.getId(),
+      sheet.toJSON()
+    );
+    
+    return sheet;
+  }
+
+  async getSheet(id: number): Promise<Sheet> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheet(id);
+    if (!sheet) {
+      console.error('Sheet not found:', id);
+      throw new Error('Sheet not found');
     }
-  }
 
-  async getAllCells(sheetId: number) {
-    try {
-      return this.sheetService.getAllCells(sheetId);
-    } catch (error) {
-      throw new Error('Failed to get cells');
+    // Try to get cached data
+    const cachedData = await this.cacheService.getSheet(workbook.getId(), id);
+    if (cachedData) {
+      Object.entries(cachedData.cells || {}).forEach(([cellId, cellData]) => {
+        sheet.setCell(cellId, cellData as CellData);
+      });
     }
+
+    return sheet;
   }
 
-  async getCellValue(sheetId: number, cellId: string) {
-    try {
-      return this.sheetService.getCellValue(sheetId, cellId);
-    } catch (error) {
-      throw new Error('Failed to get cell value');
-    }
-  }
-
-  async setCellValue(sheetId: number, cellId: string, value: any) {
-    try {
-      return this.sheetService.setCellValue(sheetId, cellId, value);
-    } catch (error) {
-      throw new Error('Failed to set cell value');
-    }
-  }
-
-  async getModifiedCells(sheetId: number) {
-    try {
-      return this.sheetService.getModifiedCells(sheetId);
-    } catch (error) {
-      throw new Error('Failed to get modified cells');
-    }
-  }
-
-  async clearModifiedCells(sheetId: number) {
-    try {
-      return this.sheetService.clearModifiedCells(sheetId);
-    } catch (error) {
-      throw new Error('Failed to clear modified cells');
-    }
-  }
-
-  async setName(sheetId: number, name: string) {
-    try {
-      const result = await this.sheetService.setName(sheetId, name);
-      
-      // Update cache
-      const workbook = Workbook.getInstance();
-      const sheet = workbook.getSheet(sheetId);
-      if (sheet) {
-        await this.cacheService.setWithExpiry(
-          this.cacheService.generateSheetKey(workbook.getId(), sheetId),
-          sheet.toJSON()
-        );
-      }
-      
-      return result;
-    } catch (error) {
-      throw new Error('Failed to set sheet name');
-    }
-  }
-
-  async addSheet(name: string) {
-    try {
-      const workbook = Workbook.getInstance();
-      
-      // Create new sheet
-      const newSheet = workbook.addSheet(name);
-      
-      // Save to cache
-      await this.cacheService.setSheet(
+  async getAllSheets(): Promise<Sheet[]> {
+    const workbook = this.application.getWorkbook();
+    const sheets = workbook.getSheets();
+    if (sheets.length === 0) {
+      // If no sheets exist, create and cache initial sheet
+      const sheet = workbook.ensureInitialSheet();
+      await this.cacheService.cacheSheet(
         workbook.getId(),
-        newSheet.id,
-        newSheet.toJSON()
+        sheet.getId(),
+        sheet.toJSON()
       );
-
-      return newSheet;
-    } catch (error) {
-      console.error('Failed to add sheet:', error);
-      throw error;
+      return [sheet];
     }
+    return sheets;
+  }
+
+  async deleteSheet(name: string): Promise<void> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheetByName(name);
+    if (!sheet) throw new Error('Sheet not found');
+    
+    workbook.removeSheet(sheet.getId());
+    await this.cacheService.deleteSheet(workbook.getId(), sheet.getId());
+  }
+
+  async updateSheet(name: string, updates: Partial<SheetData>): Promise<Sheet> {
+    const workbook = this.application.getWorkbook();
+    const sheet = workbook.getSheetByName(name);
+    if (!sheet) throw new Error('Sheet not found');
+
+    if (updates.name) {
+      sheet.setName(updates.name);
+    }
+    
+    if (updates.cells) {
+      Object.entries(updates.cells).forEach(([id, data]) => {
+        sheet.setCell(id, data);
+      });
+    }
+
+    await this.cacheService.cacheSheet(
+      workbook.getId(),
+      sheet.getId(),
+      sheet.toJSON()
+    );
+    
+    return sheet;
   }
 } 

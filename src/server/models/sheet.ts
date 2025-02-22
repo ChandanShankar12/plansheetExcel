@@ -7,10 +7,15 @@ export class Sheet {
   private history: Map<string, CellData[]>;
 
   constructor(id: number, name: string) {
+    if (id <= 0) {
+      console.error('Invalid sheet ID:', id);
+      throw new Error('Invalid sheet ID');
+    }
     this.id = id;
-    this.name = name;
+    this.name = name.trim();
     this.cells = new Map();
     this.history = new Map();
+    console.log('Created new sheet:', { id: this.id, name: this.name });
   }
 
   getId(): number {
@@ -22,29 +27,31 @@ export class Sheet {
   }
 
   setName(name: string): void {
-    this.name = name;
+    this.name = name.trim();
   }
 
   getCell(id: string): CellData {
     const cell = this.cells.get(id);
-    return cell || { value: '', isModified: false };
+    if (!cell) {
+      return {
+        value: '',
+        formula: '',
+        style: {},
+        isModified: false,
+        lastModified: new Date().toISOString()
+      };
+    }
+    return cell;
   }
 
   setCell(id: string, data: Partial<CellData>): void {
     const existing = this.getCell(id);
-    const newData = {
+    const newData: CellData = {
       ...existing,
       ...data,
       lastModified: new Date().toISOString(),
       isModified: true
     };
-
-    // Save to history
-    const cellHistory = this.history.get(id) || [];
-    cellHistory.push({ ...existing });
-    this.history.set(id, cellHistory.slice(-10)); // Keep last 10 changes
-
-    // Update cell
     this.cells.set(id, newData);
   }
 
@@ -93,6 +100,10 @@ export class Sheet {
   }
 
   static fromJSON(data: any): Sheet {
+    if (!data.id || typeof data.id !== 'number') {
+      console.error('Invalid sheet data:', data); // Debug log
+      throw new Error('Invalid sheet data: missing or invalid ID');
+    }
     const sheet = new Sheet(data.id, data.name);
     Object.entries(data.cells || {}).forEach(([id, cellData]) => {
       sheet.setCell(id, cellData as CellData);
