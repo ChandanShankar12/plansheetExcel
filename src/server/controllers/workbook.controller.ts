@@ -16,9 +16,10 @@ export class WorkbookController {
     return WorkbookController._instance;
   }
 
-  public async addSheet(name: string): Promise<Sheet> {
-    console.log('[WorkbookController] Adding sheet:', name);
-    return this.workbook.addSheet(name);
+  public async addSheet(name?: string): Promise<Sheet> {
+    const sheet = this.workbook.addSheet(name);
+    await this.saveWorkbook();
+    return sheet;
   }
 
   public getSheets(): Sheet[] {

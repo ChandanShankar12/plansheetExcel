@@ -1,25 +1,29 @@
 import { CellData } from '@/lib/types';
 
 export class Sheet {
-  private readonly _id: string;
+  private _id: number;
   private _name: string;
   private _cells: Map<string, CellData>;
-  private history: Map<string, CellData[]>;
+  private _history: Map<string, CellData[]>;
 
-  constructor(sequence: number, name: string) {
-    this._id = `${Date.now()}-${sequence}`;
-    this._name = name.trim();
+  constructor(id: number, name?: string) {
+    this._id = id;
+    this._name = (name || `Sheet ${id}`).trim();
     this._cells = new Map();
-    this.history = new Map();
+    this._history = new Map();
     console.log('[Sheet] Created new sheet:', { id: this._id, name: this._name });
   }
 
-  getId(): string {
+  getId(): number {
     return this._id;
   }
 
   getName(): string {
     return this._name;
+  }
+
+  setName(name: string): void {
+    this._name = name.trim();
   }
 
   getCell(id: string): CellData {
@@ -51,20 +55,20 @@ export class Sheet {
     const existing = this.getCell(id);
     if (existing.value || existing.formula) {
       // Save to history before clearing
-      const cellHistory = this.history.get(id) || [];
+      const cellHistory = this._history.get(id) || [];
       cellHistory.push({ ...existing });
-      this.history.set(id, cellHistory.slice(-10));
+      this._history.set(id, cellHistory.slice(-10));
     }
     this._cells.delete(id);
   }
 
   clearCells(): void {
     this._cells.clear();
-    this.history.clear();
+    this._history.clear();
   }
 
   getCellHistory(id: string): CellData[] {
-    return this.history.get(id) || [];
+    return this._history.get(id) || [];
   }
 
   getNonEmptyCellIds(): string[] {
@@ -93,7 +97,7 @@ export class Sheet {
 
   static fromJSON(data: any): Sheet {
     const sheet = new Sheet(
-      parseInt(data.id) || 0,
+      parseInt(data.id) || 1,
       data.name || 'Untitled Sheet'
     );
     

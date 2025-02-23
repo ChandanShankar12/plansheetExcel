@@ -14,7 +14,7 @@ export class Workbook {
   private static _instance: Workbook | null = null;
   private _sheets: Sheet[] = [];
   private _config: UserConfig;
-  private _sequence = 1;
+  private _nextSheetId = 1;  // Track next available ID
 
   constructor() {
     if (Workbook._instance) {
@@ -55,17 +55,29 @@ export class Workbook {
     return this._sheets;
   }
 
-  addSheet(name: string): Sheet {
-    const sheet = new Sheet(this._sequence++, name);
+  addSheet(name?: string): Sheet {
+    // Generate unique name
+    const existingNames = new Set(this._sheets.map(s => s.getName()));
+    let uniqueName = name || `Sheet ${this._nextSheetId}`;
+    let counter = this._nextSheetId;
+    
+    while (existingNames.has(uniqueName)) {
+      counter++;
+      uniqueName = `Sheet ${counter}`;
+    }
+
+    // Create new sheet with next available ID
+    const sheet = new Sheet(this._nextSheetId, uniqueName);
     this._sheets.push(sheet);
+    this._nextSheetId++;
     return sheet;
   }
 
-  getSheet(id: string): Sheet | undefined {
+  getSheet(id: number): Sheet | undefined {
     return this._sheets.find(sheet => sheet.getId() === id);
   }
 
-  removeSheet(id: string): void {
+  removeSheet(id: number): void {
     this._sheets = this._sheets.filter(sheet => sheet.getId() !== id);
   }
 
@@ -137,7 +149,7 @@ export class Workbook {
         const sheet = Sheet.fromJSON(sheetData);
         this._sheets.push(sheet);
         // Update _nextSheetId to be higher than any existing sheet ID
-        this._sequence = Math.max(this._sequence, sheet.getId());
+        this._nextSheetId = Math.max(this._nextSheetId, sheet.getId());
       });
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSpreadsheet } from '@/context/spreadsheet-context';
-import { useRef, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { Plus } from 'lucide-react';
 
 /**
@@ -12,7 +12,7 @@ export function SheetsBar() {
 
   const handleAddSheet = useCallback(async () => {
     const nextNumber = sheets.length + 1;
-    await addSheet(`Sheet ${nextNumber}`);
+    await addSheet(`Sheet ${nextNumber}`);  // Pass only the name
   }, [addSheet, sheets.length]);
 
   return (
@@ -20,7 +20,7 @@ export function SheetsBar() {
       <div className="flex flex-1">
         {sheets.map((sheet) => (
           <div
-            key={sheet.getId()}
+            key={sheet.getId()}  // Use numeric ID as key
             className={`
               relative flex items-center h-[24px] px-3
               cursor-pointer select-none border-r border-[#e1e3e6]

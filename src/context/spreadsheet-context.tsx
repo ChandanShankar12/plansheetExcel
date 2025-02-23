@@ -15,7 +15,7 @@ interface SpreadsheetContextType {
   activeSheet: Sheet | null;
   activeCell: string | null;
   selection: Selection | null;
-  addSheet: (name: string) => Promise<void>;
+  addSheet: (name?: string) => Promise<void>;
   switchSheet: (sheet: Sheet) => void;
   updateCell: (id: string, data: Partial<CellData>) => void;
   setActiveCell: (id: string | null) => void;
@@ -31,22 +31,17 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [selection, setSelection] = useState<Selection | null>(null);
   const isAddingRef = useRef(false);
 
-  const addSheet = useCallback(async (name: string) => {
-    if (isAddingRef.current) return;
+  const addSheet = useCallback(async (name?: string) => {
+    if (!workbook) return;
     
     try {
-      isAddingRef.current = true;
-      const newSheet = await WorkbookController.instance.addSheet(name);
-      setSheets(prev => [...prev, newSheet]);
+      const newSheet = workbook.addSheet(name);
+      setSheets([...workbook.getSheets()]);
       setActiveSheet(newSheet);
     } catch (error) {
-      console.error('[SpreadsheetContext] Failed to add sheet:', error);
-    } finally {
-      setTimeout(() => {
-        isAddingRef.current = false;
-      }, 100);
+      console.error('Failed to add sheet:', error);
     }
-  }, []);
+  }, [workbook]);
 
   const switchSheet = useCallback((sheet: Sheet) => {
     if (sheets.includes(sheet)) {
