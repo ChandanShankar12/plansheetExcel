@@ -11,23 +11,23 @@ export interface UserConfig {
 }
 
 export class Workbook {
-  private static _nextSheetId = 1;
-  private static _initialized = false;
-  private readonly _sheets: Sheet[];
+  private static _instance: Workbook | null = null;
+  private _sheets: Sheet[] = [];
   private _config: UserConfig;
+  private _sequence = 1;
 
   constructor() {
-    if (!Workbook._initialized) {
-      console.log('[Workbook] Initializing new workbook');
-      this._sheets = [];
-      this._config = this.getDefaultConfig();
-      
-      // Create default sheet with ID 1
-      console.log('[Workbook] Creating default sheet');
-      this.addSheet('Sheet 1');
-      
-      Workbook._initialized = true;
+    if (Workbook._instance) {
+      return Workbook._instance;
     }
+
+    console.log('[Workbook] Creating new instance');
+    this._config = this.getDefaultConfig();
+    
+    console.log('[Workbook] Creating default sheet');
+    this.addSheet('Sheet 1');
+    
+    Workbook._instance = this;
   }
 
   private getDefaultConfig(): UserConfig {
@@ -56,28 +56,16 @@ export class Workbook {
   }
 
   addSheet(name: string): Sheet {
-    console.log('[Workbook] Adding new sheet:', name);
-    const id = Workbook._nextSheetId++;
-    const sheet = new Sheet(id, name);
-    console.log('[Workbook] Created sheet:', { id: sheet.getId(), name: sheet.getName() });
+    const sheet = new Sheet(this._sequence++, name);
     this._sheets.push(sheet);
     return sheet;
   }
 
-  getSheet(id: number): Sheet | undefined {
-    console.log('Looking for sheet with ID:', id);
-    console.log('Available sheets:', this._sheets.map(s => ({
-      id: s.getId(),
-      name: s.getName()
-    })));
-    const sheet = this._sheets.find(sheet => sheet.getId() === id);
-    if (!sheet) {
-      console.error(`Sheet ${id} not found in workbook`);
-    }
-    return sheet;
+  getSheet(id: string): Sheet | undefined {
+    return this._sheets.find(sheet => sheet.getId() === id);
   }
 
-  removeSheet(id: number): void {
+  removeSheet(id: string): void {
     this._sheets = this._sheets.filter(sheet => sheet.getId() !== id);
   }
 
@@ -140,14 +128,16 @@ export class Workbook {
       ...data.config
     };
 
-    // Clear existing sheets and load from data
+    // Clear existing sheets
     this._sheets.length = 0;
+
+    // Load sheets and update next ID
     if (data.sheets?.length) {
       data.sheets.forEach((sheetData: any) => {
         const sheet = Sheet.fromJSON(sheetData);
         this._sheets.push(sheet);
         // Update _nextSheetId to be higher than any existing sheet ID
-        Workbook._nextSheetId = Math.max(Workbook._nextSheetId, sheet.getId() + 1);
+        this._sequence = Math.max(this._sequence, sheet.getId());
       });
     }
 

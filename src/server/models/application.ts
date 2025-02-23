@@ -5,26 +5,26 @@ export class Application {
   private readonly _workbook: Workbook;
 
   private constructor() {
-    // Only create workbook if it doesn't exist
-    if (!this._workbook) {
-      console.log('[Application] Initializing singleton instance');
-      this._workbook = new Workbook();
-      console.log('[Application] Created workbook instance');
+    console.log('[Application] Constructor called, instance exists?', !!Application._instance);
+    
+    if (Application._instance) {
+      console.log('[Application] Returning existing instance');
+      return Application._instance;
     }
+
+    console.log('[Application] Creating new instance');
+    this._workbook = new Workbook();
+    Application._instance = this;
   }
 
   public static get instance(): Application {
     if (!Application._instance) {
-      console.log('[Application] Creating new instance');
-      Application._instance = new Application();
-    } else {
-      console.log('[Application] Reusing existing instance');
+      new Application();
     }
-    return Application._instance;
+    return Application._instance!;
   }
 
   public getWorkbook(): Workbook {
-    console.log('[Application] Getting workbook');
     return this._workbook;
   }
 

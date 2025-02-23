@@ -1,32 +1,29 @@
 import { CellData } from '@/lib/types';
 
 export class Sheet {
-  private readonly id: number;
-  private name: string;
-  private cells: Map<string, CellData>;
+  private readonly _id: string;
+  private _name: string;
+  private _cells: Map<string, CellData>;
   private history: Map<string, CellData[]>;
 
-  constructor(id: number, name: string) {
-    this.id = id;
-    this.name = name;
-    this.cells = new Map();
+  constructor(sequence: number, name: string) {
+    this._id = `${Date.now()}-${sequence}`;
+    this._name = name.trim();
+    this._cells = new Map();
     this.history = new Map();
+    console.log('[Sheet] Created new sheet:', { id: this._id, name: this._name });
   }
 
-  getId(): number {
-    return this.id;
+  getId(): string {
+    return this._id;
   }
 
   getName(): string {
-    return this.name;
-  }
-
-  setName(name: string): void {
-    this.name = name.trim();
+    return this._name;
   }
 
   getCell(id: string): CellData {
-    const cell = this.cells.get(id);
+    const cell = this._cells.get(id);
     if (!cell) {
       return {
         value: '',
@@ -47,7 +44,7 @@ export class Sheet {
       lastModified: new Date().toISOString(),
       isModified: true
     };
-    this.cells.set(id, newData);
+    this._cells.set(id, newData);
   }
 
   clearCell(id: string): void {
@@ -58,11 +55,11 @@ export class Sheet {
       cellHistory.push({ ...existing });
       this.history.set(id, cellHistory.slice(-10));
     }
-    this.cells.delete(id);
+    this._cells.delete(id);
   }
 
   clearCells(): void {
-    this.cells.clear();
+    this._cells.clear();
     this.history.clear();
   }
 
@@ -71,32 +68,32 @@ export class Sheet {
   }
 
   getNonEmptyCellIds(): string[] {
-    return Array.from(this.cells.entries())
+    return Array.from(this._cells.entries())
       .filter(([_, cell]) => cell.value !== undefined && cell.value !== '')
       .map(([id]) => id);
   }
 
   getModifiedCells(): Array<{ id: string; data: CellData }> {
-    return Array.from(this.cells.entries())
+    return Array.from(this._cells.entries())
       .filter(([_, cell]) => cell.isModified)
       .map(([id, data]) => ({ id, data }));
   }
 
   getCellsData(): Record<string, CellData> {
-    return Object.fromEntries(this.cells);
+    return Object.fromEntries(this._cells);
   }
 
   toJSON() {
     return {
-      id: this.id,
-      name: this.name,
+      id: this._id,
+      name: this._name,
       cells: this.getCellsData()
     };
   }
 
   static fromJSON(data: any): Sheet {
     const sheet = new Sheet(
-      parseInt(data.id) || 1,
+      parseInt(data.id) || 0,
       data.name || 'Untitled Sheet'
     );
     
