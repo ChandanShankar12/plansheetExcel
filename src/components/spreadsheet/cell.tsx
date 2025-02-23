@@ -1,9 +1,9 @@
 'use client';
 
 import { useSpreadsheet } from '@/context/spreadsheet-context';
-import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { CellData } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface CellProps {
   id: string;
@@ -12,20 +12,23 @@ interface CellProps {
   onClick?: () => void;
   onMouseEnter?: () => void;
   onDoubleClick?: () => void;
+  style?: React.CSSProperties;
 }
 
-export function Cell({
+export const Cell = memo(function Cell({
   id,
   isActive,
   isDragging,
   onClick,
   onMouseEnter,
-  onDoubleClick
+  onDoubleClick,
+  style
 }: CellProps) {
   const { activeSheet, updateCell } = useSpreadsheet();
   const [value, setValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!activeSheet) return;
@@ -33,43 +36,30 @@ export function Cell({
     setValue(cellData.value || '');
   }, [id, activeSheet]);
 
-  const handleChange = async (newValue: string) => {
-    if (!activeSheet) return;
-    await updateCell(id, { value: newValue });
-  };
-
-  const handleDoubleClick = () => {
-    setIsEditing(true);
-    onDoubleClick?.();
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  };
-
-  const handleBlur = async () => {
+  const handleBlur = useCallback(async () => {
     if (!isEditing) return;
     
     try {
-      await updateCell(id, {
-        value,
-        isModified: true,
-        lastModified: new Date().toISOString()
-      });
+      await updateCell(id, { value });
     } catch (error) {
-      console.error('Failed to update cell:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update cell',
+        variant: 'destructive',
+      });
     } finally {
       setIsEditing(false);
     }
-  };
+  }, [id, value, updateCell, isEditing, toast]);
 
-  const handleKeyDown = async (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback(async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       await handleBlur();
     } else if (e.key === 'Escape') {
       setIsEditing(false);
     }
-  };
+  }, [handleBlur]);
 
   return (
     <div
@@ -81,9 +71,13 @@ export function Cell({
         ${isActive ? 'z-10 outline outline-1 outline-[#1a73e8]' : ''}
         ${isDragging ? 'bg-[#e8f0fe]' : ''}
       `}
+      style={style}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={() => {
+        setIsEditing(true);
+        onDoubleClick?.();
+      }}
     >
       {isEditing ? (
         <input
@@ -102,4 +96,4 @@ export function Cell({
       )}
     </div>
   );
-} 
+}); 

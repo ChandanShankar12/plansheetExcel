@@ -3,7 +3,7 @@ import { CacheService } from '../services/cache.service';
 import { Application } from '../models/application';
 
 export class WorkbookController {
-  private static _instance: WorkbookController;
+  private static _instance: WorkbookController | null = null;
   private readonly cacheService: CacheService;
   private readonly application: Application;
 
@@ -19,24 +19,27 @@ export class WorkbookController {
     return WorkbookController._instance;
   }
 
-  getWorkbook(): Workbook {
+  public getWorkbook(): Workbook {
     return this.application.getWorkbook();
   }
 
-  async addSheet(name: string) {
+  async addSheet(name?: string) {
     try {
+      console.log('[WorkbookController] Adding new sheet:', name);
       const workbook = this.application.getWorkbook();
-      const sheet = workbook.addSheet(name);
+      const sheetName = name || `Sheet ${workbook.getSheets().length + 1}`;
+      const sheet = workbook.addSheet(sheetName);
       
-      // Cache the new sheet
+      console.log('[WorkbookController] Caching new sheet:', sheet.getId());
       await this.cacheService.cacheSheet(
-        workbook.getId(),
+        workbook.getName(),
         sheet.getId(),
         sheet.toJSON()
       );
       
       return sheet;
     } catch (error) {
+      console.error('[WorkbookController] Failed to add sheet:', error);
       throw new Error('Failed to add sheet');
     }
   }
@@ -51,7 +54,7 @@ export class WorkbookController {
       
       // Cache the updated sheet
       await this.cacheService.cacheSheet(
-        workbook.getId(),
+        workbook.getName(),
         sheet.getId(),
         sheet.toJSON()
       );
@@ -69,7 +72,7 @@ export class WorkbookController {
       
       // Cache the updated workbook config
       await this.cacheService.cacheSheet(
-        workbook.getId(),
+        workbook.getName(),
         0,
         workbook.toJSON()
       );
@@ -78,16 +81,12 @@ export class WorkbookController {
     }
   }
 
-  async saveWorkbook(): Promise<void> {
-    try {
-      const workbook = this.application.getWorkbook();
-      await this.cacheService.cacheSheet(
-        workbook.getId(),
-        0,
-        workbook.toJSON()
-      );
-    } catch (error) {
-      throw new Error('Failed to save workbook');
-    }
+  public async saveWorkbook(): Promise<void> {
+    const workbook = this.getWorkbook();
+    await this.cacheService.cacheSheet(
+      workbook.getName(),
+      0,
+      workbook.toJSON()
+    );
   }
 } 

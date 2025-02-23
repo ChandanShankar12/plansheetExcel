@@ -5,7 +5,7 @@ import { SheetData } from '@/lib/types';
 import { CellData } from '@/lib/types';
 
 export class SheetController {
-  private static _instance: SheetController;
+  private static _instance: SheetController | null = null;
   private readonly cacheService: CacheService;
   private readonly application: Application;
 
@@ -24,11 +24,9 @@ export class SheetController {
   async createSheet(name: string): Promise<Sheet> {
     const workbook = this.application.getWorkbook();
     const sheet = workbook.addSheet(name);
-    console.log('Creating sheet in controller:', sheet.getId(), sheet.getName());
     
-    // Cache the new sheet
     await this.cacheService.cacheSheet(
-      workbook.getId(),
+      workbook.getName(),
       sheet.getId(),
       sheet.toJSON()
     );
@@ -39,36 +37,13 @@ export class SheetController {
   async getSheet(id: number): Promise<Sheet> {
     const workbook = this.application.getWorkbook();
     const sheet = workbook.getSheet(id);
-    if (!sheet) {
-      console.error('Sheet not found:', id);
-      throw new Error('Sheet not found');
-    }
-
-    // Try to get cached data
-    const cachedData = await this.cacheService.getSheet(workbook.getId(), id);
-    if (cachedData) {
-      Object.entries(cachedData.cells || {}).forEach(([cellId, cellData]) => {
-        sheet.setCell(cellId, cellData as CellData);
-      });
-    }
-
+    if (!sheet) throw new Error('Sheet not found');
     return sheet;
   }
 
   async getAllSheets(): Promise<Sheet[]> {
     const workbook = this.application.getWorkbook();
-    const sheets = workbook.getSheets();
-    if (sheets.length === 0) {
-      // If no sheets exist, create and cache initial sheet
-      const sheet = workbook.ensureInitialSheet();
-      await this.cacheService.cacheSheet(
-        workbook.getId(),
-        sheet.getId(),
-        sheet.toJSON()
-      );
-      return [sheet];
-    }
-    return sheets;
+    return workbook.getSheets();
   }
 
   async deleteSheet(name: string): Promise<void> {
@@ -77,12 +52,12 @@ export class SheetController {
     if (!sheet) throw new Error('Sheet not found');
     
     workbook.removeSheet(sheet.getId());
-    await this.cacheService.deleteSheet(workbook.getId(), sheet.getId());
+    await this.cacheService.deleteSheet(workbook.getName(), sheet.getId());
   }
 
-  async updateSheet(name: string, updates: Partial<SheetData>): Promise<Sheet> {
+  async updateSheet(id: number, updates: Partial<SheetData>): Promise<Sheet> {
     const workbook = this.application.getWorkbook();
-    const sheet = workbook.getSheetByName(name);
+    const sheet = workbook.getSheet(id);
     if (!sheet) throw new Error('Sheet not found');
 
     if (updates.name) {
@@ -96,7 +71,7 @@ export class SheetController {
     }
 
     await this.cacheService.cacheSheet(
-      workbook.getId(),
+      workbook.getName(),
       sheet.getId(),
       sheet.toJSON()
     );

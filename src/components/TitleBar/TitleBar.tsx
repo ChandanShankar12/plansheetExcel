@@ -1,19 +1,26 @@
-import Image from 'next/image';
+'use client';
 
+import { 
+  ChevronDown,
+} from 'lucide-react';
 import { Button } from '../ui/button';
 import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
 import { SaveButton } from '../ui/SaveButton';
 import { Divider } from '../ui/divider';
+import { memo } from 'react';
+import { useSpreadsheet } from '@/context/spreadsheet-context';
 
-export const TitleBar = () => {
+export const TitleBar = memo(function TitleBar() {
+  const { activeSheet } = useSpreadsheet();
+  
   return (
     <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2">
       {/* Left section */}
       <div className="flex flex-row items-center gap-1">
         <SaveButton />
         <Divider />
-        <span className="text-[12px]  flex flex-row items-center gap-2">
+        <span className="text-[12px] flex flex-row items-center gap-2">
           <ToggleSwitch /> AutoSave
         </span>
       </div>
@@ -25,47 +32,17 @@ export const TitleBar = () => {
 
       {/* Right section */}
       <div className="flex flex-row items-center gap-1">
+        {/* Sheet name */}
+        <span className="text-[12px]">
+          {activeSheet?.getName() || 'No sheet selected'}
+        </span>
+        
         {/* Language selector */}
-        <div className="flex flex-row items-center gap-2">
+        <div className="flex flex-row items-center gap-2 ml-4">
           <span className="text-[10px]">English</span>
-          <Image
-            src="/Icons/icon_chevron.svg"
-            alt="Search"
-            width={20}
-            height={20}
-          />
-        </div>
-
-        <Divider />
-
-        {/* Window controls */}
-        <div className="flex flex-row items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
-            <Image
-              src="/Icons/mingcute_minimize-fill.svg"
-              alt="Minimize"
-              width={12}
-              height={12}
-            />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
-            <Image
-              src="/Icons/mingcute_restore-line.svg"
-              alt="Restore"
-              width={12}
-              height={12}
-            />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-3.5 w-3.5">
-            <Image
-              src="/Icons/radix-icons_cross-2.svg"
-              alt="Close"
-              width={12}
-              height={12}
-            />
-          </Button>
+          <ChevronDown className="w-4 h-4" />
         </div>
       </div>
     </div>
   );
-};
+});

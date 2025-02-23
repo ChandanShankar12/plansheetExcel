@@ -1,26 +1,17 @@
-import { NextResponse } from 'next/server';
-import { Application } from '@/server/models/application';
-import { ApplicationController } from '@/server/controllers/application-controller';
+import { WorkbookController } from '@/server/controllers/workbook.controller';
+
+const workbookController = WorkbookController.instance;
 
 export async function POST(request: Request) {
   try {
-    const { application } = await request.json();
-    if (!application) {
-      return NextResponse.json({ error: 'Missing application data' }, { status: 400 });
-    }
-
-    const app = Application.fromJSON(application);
-    const dtstData = await ApplicationController.saveWorkbook(app);
-
-    return new NextResponse(JSON.stringify(dtstData), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Disposition': 'attachment; filename="workbook.dtst"',
-        'Cache-Control': 'no-cache'
-      }
-    });
+    // Save workbook without additional data
+    await workbookController.saveWorkbook();
+    return Response.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to save workbook' }, { status: 500 });
+    console.error('Failed to save workbook:', error);
+    return Response.json({ 
+      success: false, 
+      error: 'Failed to save workbook' 
+    }, { status: 500 });
   }
 } 

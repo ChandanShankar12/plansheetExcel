@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SheetController } from '@/server/controllers/sheet.controller';
-import { Application } from '@/server/models/application';
 
 const sheetController = SheetController.instance;
-const app = Application.instance;
 
 export async function GET(
   req: NextRequest,

@@ -1,8 +1,4 @@
-
-
 import { Slider } from "../ui/slider";
-
-
 
 import React from 'react'
 
@@ -17,13 +13,17 @@ export const AppStatusBar = () => {
           </span>
         </div>
         <div className="w-[200px] px-4">
-          <Slider
+          {/* <Slider
             defaultValue={[50, 50]}
             orientation="horizontal"
             min={1}
             max={100}
             step={1}
-          />
+          /> */}
+        </div>
+        <div className="flex gap-2">
+          {/* <ZoomIn className="w-4 h-4" />
+          <ZoomOut className="w-4 h-4" /> */}
         </div>
       </div>
   )

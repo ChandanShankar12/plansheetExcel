@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CellController } from '@/server/controllers/cell.controller';
-import { Application } from '@/server/models/application';
+
 
 const cellController = CellController.instance;
-const app = Application.instance;
 
 // GET: Get a specific cell's value
 export async function GET(
@@ -33,44 +32,42 @@ export async function POST(
   { params }: { params: { sheetId: string; cellId: string } }
 ) {
   try {
-    const updates = await req.json();
+    const { value, formula, style } = await req.json();
     const sheetId = parseInt(params.sheetId);
     
+    try {
     if (isNaN(sheetId)) {
-      console.error('Invalid sheet ID:', params.sheetId);
       return NextResponse.json({ 
         success: false, 
         error: 'Invalid sheet ID' 
-      }, { status: 400 });
+      }, { status: 400, });
     }
 
-    const workbook = app.getWorkbook();
-    const sheet = workbook.getSheet(sheetId);
-    
-    if (!sheet) {
-      const sheets = workbook.getSheets();
-      console.error(`Sheet not found: ${sheetId}. Available sheets:`, 
-        sheets.map(s => ({ id: s.getId(), name: s.getName() }))
-      );
+    if (isNaN(parseInt(params.cellId))) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
+        error: 'Invalid cell ID' 
+      }, { status: 400 });
+    }} catch (error) {
+      console.error('Failed to update cell:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to update cell'
+      }, { status: 500 });
     }
-
-    // Update the cell
-    sheet.setCell(params.cellId, {
-      ...updates,
+    
+    // Use cellController directly
+    await cellController.setValue(sheetId, params.cellId, {
+      value,
+      formula,
+      style,
       isModified: true,
       lastModified: new Date().toISOString()
     });
 
-    // Cache the updated sheet
-    await cellController.setValue(sheetId, params.cellId, updates);
-
     return NextResponse.json({
       success: true,
-      data: sheet.getCell(params.cellId)
+      data: await cellController.getValue(sheetId, params.cellId)
     });
   } catch (error) {
     console.error('Failed to update cell:', error);

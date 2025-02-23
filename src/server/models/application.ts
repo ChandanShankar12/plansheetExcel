@@ -1,38 +1,36 @@
 import { Workbook } from './workbook';
 
 export class Application {
-  private static _instance: Application;
-  private static _workbook: Workbook; // Make workbook static
+  private static _instance: Application | null = null;
+  private readonly _workbook: Workbook;
 
   private constructor() {
-    if (!Application._workbook) {
-      Application._workbook = new Workbook();
-      const initialSheet = Application._workbook.addSheet('Sheet 1');
-      console.log('Application initialized with sheet:', initialSheet.getId());
+    // Only create workbook if it doesn't exist
+    if (!this._workbook) {
+      console.log('[Application] Initializing singleton instance');
+      this._workbook = new Workbook();
+      console.log('[Application] Created workbook instance');
     }
   }
 
   public static get instance(): Application {
     if (!Application._instance) {
+      console.log('[Application] Creating new instance');
       Application._instance = new Application();
+    } else {
+      console.log('[Application] Reusing existing instance');
     }
     return Application._instance;
   }
 
   public getWorkbook(): Workbook {
-    return Application._workbook;
-  }
-
-  public setWorkbook(workbook: Workbook): void {
-    Application._workbook = workbook;
-    if (workbook.getSheets().length === 0) {
-      workbook.addSheet('Sheet 1');
-    }
+    console.log('[Application] Getting workbook');
+    return this._workbook;
   }
 
   public toJSON() {
     return {
-      workbook: Application._workbook.toJSON()
+      workbook: this._workbook.toJSON()
     };
   }
 
@@ -42,7 +40,7 @@ export class Application {
     }
     if (data?.workbook) {
       const workbook = Workbook.fromJSON(data.workbook);
-      Application._instance.setWorkbook(workbook);
+      Application._instance._workbook.fromJSON(data.workbook);
     }
   }
 }

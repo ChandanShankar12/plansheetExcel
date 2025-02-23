@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
 /* Base styles */
 html, body {
   @apply overflow-hidden;
@@ -10,6 +18,42 @@ html, body {
 
 * {
   @apply select-none box-border;
+}
+
+/* Grid styles */
+.grid-container {
+  @apply relative min-w-max h-full bg-white;
+  contain: strict;
+}
+
+/* Cell styles */
+.cell {
+  @apply w-[100px] h-[24px] border-r border-b border-[#e1e3e6] bg-white hover:bg-[#f8f9fa] relative select-none;
+}
+
+.cell-active {
+  @apply z-10 outline outline-1 outline-[#1a73e8];
+}
+
+.cell-dragging {
+  @apply bg-[#e8f0fe];
+}
+
+/* Header styles */
+.header {
+  @apply flex items-center justify-center text-[11px] text-[#333] bg-[#f8f9fa] font-medium border-r border-b border-[#e1e3e6];
+}
+
+.corner-header {
+  @apply w-[48px] h-[24px];
+}
+
+.column-header {
+  @apply w-[100px] h-[24px];
+}
+
+.row-header {
+  @apply sticky left-0 z-10 w-[48px] h-[24px];
 }
 
 /* Scrollbar styles */
@@ -33,13 +77,6 @@ html, body {
   @apply bg-[#f1f1f1];
 }
 
-/* Grid styles */
-.grid-container {
-  @apply relative min-w-max h-full bg-white;
-  contain: strict;
-  contain-intrinsic-size: 1000px;
-}
-
 /* Selection styles */
 ::selection {
   @apply bg-[#e8f0fe];
@@ -48,10 +85,6 @@ html, body {
 /* Cell styles */
 .cell-selected {
   @apply bg-[#e8f0fe] !important;
-}
-
-.cell-active {
-  @apply outline outline-1 outline-[#1a73e8] z-[2] !important;
 }
 
 /* Grid lines */

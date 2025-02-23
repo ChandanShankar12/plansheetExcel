@@ -3,20 +3,20 @@ import { CacheService } from '../services/cache.service';
 import { Workbook } from '../models/workbook';
 
 export class ApplicationController {
-  private static instance: ApplicationController | null = null;
-  private application: Application;
-  private cacheService: CacheService;
+  private static _instance: ApplicationController | null = null;
+  private readonly application: Application;
+  private readonly cacheService: CacheService;
 
   private constructor() {
-    this.application = Application.getInstance();
-    this.cacheService = CacheService.getInstance();
+    this.application = Application.instance;
+    this.cacheService = CacheService.instance;
   }
 
-  static getInstance(): ApplicationController {
-    if (!ApplicationController.instance) {
-      ApplicationController.instance = new ApplicationController();
+  public static get instance(): ApplicationController {
+    if (!ApplicationController._instance) {
+      ApplicationController._instance = new ApplicationController();
     }
-    return ApplicationController.instance;
+    return ApplicationController._instance;
   }
 
   getCurrentWorkbook(): Workbook {
@@ -27,29 +27,12 @@ export class ApplicationController {
     }
   }
 
-  getAllWorkbooks(): Workbook[] {
-    try {
-      return this.application.getAllWorkbooks();
-    } catch (error) {
-      throw new Error('Failed to get all workbooks');
-    }
-  }
-
-  async removeWorkbook(id: string): Promise<void> {
-    try {
-      this.application.removeWorkbook(id);
-      await this.cacheService.clearWorkbookCache(id);
-    } catch (error) {
-      throw new Error('Failed to remove workbook');
-    }
-  }
-
   async saveApplicationState(): Promise<string> {
     try {
       const state = this.application.toJSON();
       const workbook = this.application.getWorkbook();
       await this.cacheService.cacheSheet(
-        workbook.getId(),
+        workbook.getName(),
         0,
         state
       );

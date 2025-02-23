@@ -1,15 +1,24 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Application } from '@/server/models/application';
 import { Sheet } from '@/server/models/sheet';
 import { Selection, CellData } from '@/lib/types';
 
+// Create singleton instances with logging - OUTSIDE of any component
+const appInstance = Application.instance;
+console.log('[SpreadsheetContext] Initial app instance created');
+
+const workbookInstance = appInstance.getWorkbook();
+console.log('[SpreadsheetContext] Initial workbook retrieved');
+
+const initialSheetsList = workbookInstance.getSheets();
+console.log('[SpreadsheetContext] Initial sheets loaded:', initialSheetsList.length);
+
 interface SpreadsheetContextType {
   // Core state
-  app: Application;
-  activeSheet: Sheet | null;
   sheets: Sheet[];
+  activeSheet: Sheet | null;
   
   // UI state
   activeCell: string | null;
@@ -21,163 +30,66 @@ interface SpreadsheetContextType {
   switchSheet: (sheet: Sheet) => Promise<void>;
   updateCell: (id: string, data: Partial<CellData>) => Promise<void>;
   setActiveCell: (id: string | null) => void;
-  setSelection: (selection: Selection) => void;
+  setSelection: (selection: Selection | null) => void;
 }
 
-const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
-
-// Define the hook first
-export const useSpreadsheet = () => {
-  const context = useContext(SpreadsheetContext);
-  if (!context) {
-    throw new Error('useSpreadsheet must be used within SpreadsheetProvider');
-  }
-  return context;
-};
-
-// Then export the alias
-export const useSpreadsheetContext = useSpreadsheet;
+const SpreadsheetContext = createContext<SpreadsheetContextType | null>(null);
 
 export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with singleton Application instance
-  const [app] = useState(() => Application.instance);
-  
-  // Get sheets from workbook and maintain reference
-  const [sheets, setSheets] = useState<Sheet[]>(() => {
-    const existingSheets = app.getWorkbook().getSheets();
-    console.log('Initial sheets:', existingSheets.map(s => ({
-      id: s.getId(),
-      name: s.getName()
-    })));
-    return existingSheets;
-  });
-  
-  // First sheet is always active initially
-  const [activeSheet, setActiveSheet] = useState<Sheet | null>(() => sheets[0]);
-  
+  // Use the pre-initialized instances
+  const [sheets, setSheets] = useState(initialSheetsList);
+  const [activeSheet, setActiveSheet] = useState(sheets[0] || null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [activeCell, setActiveCell] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
 
-  // Add new sheet to existing workbook
-  const addSheet = useCallback(async (name?: string): Promise<Sheet | null> => {
+  // Sheet operations
+  const addSheet = useCallback(async (name?: string) => {
     if (isTransitioning) return null;
+    console.log('[SpreadsheetContext] Adding new sheet:', name);
+    setIsTransitioning(true);
     
     try {
-      setIsTransitioning(true);
-      const workbook = app.getWorkbook();
-      
-      const sheetName = name || `Sheet ${sheets.length + 1}`;
-      const newSheet = workbook.addSheet(sheetName);
-      console.log('Adding new sheet:', newSheet.getId());
-      
-      // Save to backend first
-      const response = await fetch('/api/sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          id: newSheet.getId(),
-          name: sheetName,
-          workbookId: workbook.getId()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save sheet');
-      }
-
-      // Then update local state
-      setSheets(prev => {
-        const updated = [...prev, newSheet];
-        console.log('Updated sheets:', updated.map(s => ({
-          id: s.getId(),
-          name: s.getName()
-        })));
-        return updated;
-      });
-
-      // Switch to new sheet
-      await switchSheet(newSheet);
+      const newSheet = workbookInstance.addSheet(name || `Sheet ${sheets.length + 1}`);
+      console.log('[SpreadsheetContext] Sheet added:', newSheet.getId());
+      setSheets([...sheets, newSheet]);
+      setActiveSheet(newSheet);
       return newSheet;
     } catch (error) {
-      console.error('Failed to add sheet:', error);
+      console.error('[SpreadsheetContext] Failed to add sheet:', error);
       return null;
-    } finally {
-      setIsTransitioning(false);
-    }
-  }, [app, sheets.length, isTransitioning]);
-
-  // Switch between sheets in workbook
-  const switchSheet = useCallback(async (sheet: Sheet): Promise<void> => {
-    if (isTransitioning || !sheets.includes(sheet)) return;
-    
-    try {
-      setIsTransitioning(true);
-      
-      // Load sheet data first
-      const response = await fetch(`/api/sheets/${sheet.getId()}`);
-      if (!response.ok) throw new Error('Failed to load sheet');
-      
-      const { data } = await response.json();
-      if (data.cells) {
-        Object.entries(data.cells).forEach(([cellId, cellData]) => {
-          sheet.setCell(cellId, cellData as CellData);
-        });
-      }
-
-      // Then update active sheet
-      setActiveSheet(sheet);
-    } catch (error) {
-      console.error('Failed to switch sheet:', error);
     } finally {
       setIsTransitioning(false);
     }
   }, [sheets, isTransitioning]);
 
-  const [activeCell, setActiveCell] = useState<string | null>(null);
-  const [selection, setSelection] = useState<Selection>(null);
-
-  const updateCell = useCallback(async (id: string, data: Partial<CellData>): Promise<void> => {
-    if (!activeSheet || isTransitioning) return;
-
+  const switchSheet = useCallback(async (sheet: Sheet) => {
+    if (isTransitioning || !sheets.includes(sheet)) return;
+    setIsTransitioning(true);
+    
     try {
-      // Update cell in workbook first
+      setActiveSheet(sheet);
+    } finally {
+      setIsTransitioning(false);
+    }
+  }, [sheets, isTransitioning]);
+
+  const updateCell = useCallback(async (id: string, data: Partial<CellData>) => {
+    if (!activeSheet || isTransitioning) return;
+    
+    try {
       activeSheet.setCell(id, {
-        value: data.value,
+        ...data,
         isModified: true,
         lastModified: new Date().toISOString()
       });
-
-      console.log('Updating cell in sheet:', activeSheet.getId(), 'Total sheets:', sheets.length);
-
-      // Send to backend for caching
-      const response = await fetch(`/api/sheets/${activeSheet.getId()}/cells/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          value: data.value,
-          isModified: true,
-          lastModified: new Date().toISOString()
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Cell update failed:', errorData);
-        throw new Error('Failed to update cell');
-      }
-
-      // Update with confirmed data from backend
-      const result = await response.json();
-      if (result.success && activeSheet) {
-        activeSheet.setCell(id, result.data);
-      }
     } catch (error) {
       console.error('Failed to update cell:', error);
       throw error;
     }
-  }, [activeSheet, isTransitioning, sheets.length]);
+  }, [activeSheet, isTransitioning]);
 
-  const value = {
-    app,
+  const value = useMemo(() => ({
     sheets,
     activeSheet,
     activeCell,
@@ -188,7 +100,16 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     updateCell,
     setActiveCell,
     setSelection
-  };
+  }), [
+    sheets,
+    activeSheet,
+    activeCell,
+    selection,
+    isTransitioning,
+    addSheet,
+    switchSheet,
+    updateCell
+  ]);
 
   return (
     <SpreadsheetContext.Provider value={value}>
@@ -196,3 +117,10 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     </SpreadsheetContext.Provider>
   );
 }
+
+export function useSpreadsheet() {
+  const context = useContext(SpreadsheetContext);
+  if (!context) throw new Error('useSpreadsheet must be used within SpreadsheetProvider');
+  return context;
+}
+

@@ -2,58 +2,54 @@
 
 import Image from 'next/image';
 import { FloatingModal } from '../ai/floating_modal';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { Input } from '../ui/input';
+import { 
+  Paperclip,
+  Send,
+  FileSpreadsheet
+} from 'lucide-react';
 
 interface AsideWrapperProps {
   children: React.ReactNode;
 }
 
-function AsideWrapper({ children }: AsideWrapperProps) {
-  const [isAsideOpen, setIsAsideOpen] = useState(false);
+// Create a stable event handler
+const useKeyboardShortcut = (callback: () => void) => {
+  const savedCallback = useRef(callback);
+  savedCallback.current = callback;
 
   useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Check for both uppercase and lowercase 'F1'
+    const handler = (event: KeyboardEvent) => {
       if (event.shiftKey && (event.key === 'F1' || event.key === 'f1')) {
         event.preventDefault();
-        console.log('Shortcut pressed'); // Debug log
-        setIsAsideOpen(prev => !prev);
+        savedCallback.current();
       }
     };
 
-    // Add the event listener to document instead of window
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, []);
+};
 
-  // Debug log for state changes
-  useEffect(() => {
-    console.log('Aside state:', isAsideOpen);
-  }, [isAsideOpen]);
+// Memoize the wrapper to prevent re-renders
+export const AsideWrapper = memo(function AsideWrapper({ children }: AsideWrapperProps) {
+  const [isAsideOpen, setIsAsideOpen] = useState(false);
+  
+  useKeyboardShortcut(() => setIsAsideOpen(prev => !prev));
 
   return (
     <div className="flex flex-row flex-1 relative">
       <div className="flex-1">{children}</div>
-   
     </div>
   );
-}
+});
 
-export function Aside() {
+// Memoize the Aside component
+export const Aside = memo(function Aside() {
   const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.shiftKey && (event.key === 'F1' || event.key === 'f1')) {
-        event.preventDefault();
-        setIsOpen(prev => !prev);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyPress);
-    return () => document.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  
+  useKeyboardShortcut(() => setIsOpen(prev => !prev));
 
   return (
     <aside 
@@ -122,21 +118,19 @@ export function Aside() {
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
               <button>
-                <Image src="/Icons/attach.svg" alt="Attach" width={20} height={20} />
+                <Paperclip className="w-5 h-5 text-gray-500" />
               </button>
               <button>
-                <Image src="/Icons/send.svg" alt="Send" width={20} height={20} />
+                <Send className="w-5 h-5 text-gray-500" />
               </button>
             </div>
           </div>
           <div className="mt-2 flex items-center gap-1">
-            <Image src="/Icons/sheets.svg" alt="Sheets" width={16} height={16} />
+            <FileSpreadsheet className="w-4 h-4 text-gray-500" />
             <span className="text-xs text-gray-500">All Sheets</span>
           </div>
         </div>
       </div>
     </aside>
   );
-}
-
-export { AsideWrapper };
+});

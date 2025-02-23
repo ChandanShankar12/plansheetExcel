@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SheetController } from '@/server/controllers/sheet.controller';
-import { Application } from '@/server/models/application';
 
 const sheetController = SheetController.instance;
-const app = Application.instance;
 
 // Interface for cell updates
 interface CellData {
@@ -31,7 +29,6 @@ export async function POST(req: NextRequest) {
   try {
     const { name } = await req.json();
     const sheet = await sheetController.createSheet(name);
-    console.log('Sheet created:', sheet.getId());
 
     return NextResponse.json({
       success: true,

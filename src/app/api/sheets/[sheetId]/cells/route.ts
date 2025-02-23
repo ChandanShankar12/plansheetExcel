@@ -1,41 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Application } from '@/server/models/application';
+import { SheetController } from '@/server/controllers/sheet.controller';
 import { CellController } from '@/server/controllers/cell.controller';
-import { CacheService } from '@/server/services/cache.service';
-import { CellData } from '@/lib/types';
 
-const app = Application.instance;
+const sheetController = SheetController.instance;
 const cellController = CellController.instance;
-const cacheService = CacheService.instance;
 
-interface CellUpdate {
-  id: string;
-  data: CellData;
-}
-
-// GET: Get all cells for a sheet
 export async function GET(
   req: NextRequest,
   { params }: { params: { sheetId: string } }
 ) {
   try {
     const sheetId = parseInt(params.sheetId);
-    const workbook = app.getWorkbook();
-    const sheet = workbook.getSheet(sheetId);
-
-    if (!sheet) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sheet not found'
-      }, { status: 404 });
-    }
-
-    // Get all cells data
-    const cells = sheet.getCellsData();
-
+    const sheet = await sheetController.getSheet(sheetId);
     return NextResponse.json({
       success: true,
-      data: cells
+      data: sheet.getCellsData()
     });
   } catch (error) {
     console.error('Failed to get cells:', error);
@@ -51,20 +30,12 @@ export async function POST(
   { params }: { params: { sheetId: string } }
 ) {
   try {
-    const updates = await req.json() as CellUpdate[];
+    const updates = await req.json();
     const sheetId = parseInt(params.sheetId);
-    const sheet = app.getWorkbook().getSheet(sheetId);
-    
-    if (!sheet) {
-      return NextResponse.json({
-        success: false,
-        error: 'Sheet not found'
-      }, { status: 404 });
-    }
+    const sheet = await sheetController.getSheet(sheetId);
 
-    // Process all cell updates
-    for (const update of updates) {
-      await cellController.setValue(sheetId, update.id, update.data);
+    for (const { id, data } of updates) {
+      await cellController.setValue(sheetId, id, data);
     }
 
     return NextResponse.json({

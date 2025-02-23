@@ -4,45 +4,53 @@ import { useState } from 'react';
 import { useSpreadsheet } from '@/context/spreadsheet-context';
 import { Save } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Button } from './button';
+import { useToast } from '@/hooks/use-toast';
 
-export function SaveButton() {
-  const { app } = useSpreadsheet();
+export const SaveButton = () => {
+  const { sheets, activeSheet } = useSpreadsheet();
   const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   const handleSave = async () => {
-    if (isSaving) return;
+    if (isSaving || !activeSheet) return;
 
     try {
       setIsSaving(true);
-      const workbook = app.getWorkbook();
       
       const response = await fetch('/api/workbook/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(workbook.toJSON())
+        body: JSON.stringify({
+          sheets: sheets.map(s => s.toJSON())
+        })
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save workbook');
-      }
+      if (!response.ok) throw new Error('Failed to save workbook');
+
+      toast({
+        title: 'Success',
+        description: 'Workbook saved successfully',
+      });
     } catch (error) {
       console.error('Failed to save:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save workbook',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={handleSave}
-      disabled={isSaving}
-      className={`
-        flex items-center justify-center w-9 h-9
-        hover:bg-[#f1f3f4] transition-colors
-        ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-      `}
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="h-7 w-7" 
+      onClick={handleSave} 
+      disabled={isSaving || !activeSheet}
     >
       {isSaving ? (
         <motion.div
@@ -51,8 +59,8 @@ export function SaveButton() {
           className="w-4 h-4 border-2 border-[#3c4043] border-t-transparent rounded-full"
         />
       ) : (
-        <Save className="w-5 h-5 text-[#3c4043]" />
+        <Save className="h-4 w-4" />
       )}
-    </motion.button>
+    </Button>
   );
-} 
+}; 
