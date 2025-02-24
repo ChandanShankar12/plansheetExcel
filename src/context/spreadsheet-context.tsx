@@ -1,20 +1,23 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
-import { getAppInstance } from '@/lib/app-instance';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { initializeApp, getAppInstance } from '@/lib/app-instance';
 import { Sheet } from '@/server/models/sheet';
 import { Selection, CellData } from '@/lib/types';
-import { WorkbookController } from '@/server/controllers/workbook.controller';
+import { useDebounce } from '@/hooks/use-debounce';
 
-const app = getAppInstance();
-const workbook = app.getWorkbook();
-const initialSheets = workbook.getSheets();
+// Initialize app and get workbook
+const initializeSheets = async () => {
+  const app = await initializeApp();
+  return app.getWorkbook().getSheets();
+};
 
 interface SpreadsheetContextType {
   sheets: Sheet[];
   activeSheet: Sheet | null;
   activeCell: string | null;
   selection: Selection | null;
+  isLoading: boolean;
   addSheet: (name?: string) => Promise<void>;
   switchSheet: (sheet: Sheet) => void;
   updateCell: (id: string, data: Partial<CellData>) => void;
@@ -25,23 +28,54 @@ interface SpreadsheetContextType {
 const SpreadsheetContext = createContext<SpreadsheetContextType | null>(null);
 
 export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
-  const [sheets, setSheets] = useState(initialSheets);
-  const [activeSheet, setActiveSheet] = useState(sheets[0] || null);
+  const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [activeSheet, setActiveSheet] = useState<Sheet | null>(null);
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
-  const isAddingRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const pendingUpdates = useRef(new Map<string, CellData>());
+
+  // Load initial data
+  useEffect(() => {
+    initializeSheets()
+      .then(initialSheets => {
+        setSheets(initialSheets);
+        setActiveSheet(initialSheets[0] || null);
+      })
+      .catch(error => {
+        console.error('[SpreadsheetContext] Failed to initialize:', error);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
+
+  // Debounced save function
+  const debouncedSave = useDebounce(async () => {
+    if (pendingUpdates.current.size === 0) return;
+
+    try {
+      const app = getAppInstance();
+      await app.saveState();
+      pendingUpdates.current.clear();
+    } catch (error) {
+      console.error('[SpreadsheetContext] Failed to save updates:', error);
+    }
+  }, 500);
 
   const addSheet = useCallback(async (name?: string) => {
-    if (!workbook) return;
-    
     try {
+      const workbook = getAppInstance().getWorkbook();
       const newSheet = workbook.addSheet(name);
-      setSheets([...workbook.getSheets()]);
+      setSheets(workbook.getSheets());
       setActiveSheet(newSheet);
+      
+      // Save state after modification
+      await getAppInstance().saveState();
     } catch (error) {
-      console.error('Failed to add sheet:', error);
+      console.error('[SpreadsheetContext] Failed to add sheet:', error);
     }
-  }, [workbook]);
+  }, []);
 
   const switchSheet = useCallback((sheet: Sheet) => {
     if (sheets.includes(sheet)) {
@@ -51,18 +85,32 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
 
   const updateCell = useCallback((id: string, data: Partial<CellData>) => {
     if (!activeSheet) return;
-    activeSheet.setCell(id, {
+
+    // Optimistically update local state
+    const updatedData: CellData = {
+      ...activeSheet.getCell(id),
       ...data,
       isModified: true,
       lastModified: new Date().toISOString()
-    });
-  }, [activeSheet]);
+    };
+
+    // Update local state immediately
+    activeSheet.setCell(id, updatedData);
+    setSheets(prev => [...prev]); // Trigger re-render
+
+    // Track pending update
+    pendingUpdates.current.set(id, updatedData);
+
+    // Trigger debounced save
+    debouncedSave();
+  }, [activeSheet, debouncedSave]);
 
   const value = useMemo(() => ({
     sheets,
     activeSheet,
     activeCell,
     selection,
+    isLoading,
     addSheet,
     switchSheet,
     updateCell,
@@ -73,10 +121,15 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     activeSheet,
     activeCell,
     selection,
+    isLoading,
     addSheet,
     switchSheet,
     updateCell
   ]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <SpreadsheetContext.Provider value={value}>
