@@ -5,6 +5,7 @@ import { initializeApp, getAppInstance } from '@/lib/app-instance';
 import { Sheet } from '@/server/models/sheet';
 import { Selection, CellData } from '@/lib/types';
 import { useDebounce } from '@/hooks/use-debounce';
+import { useToast } from '@/hooks/use-toast';
 
 // Initialize app and get workbook
 const initializeSheets = async () => {
@@ -20,7 +21,7 @@ interface SpreadsheetContextType {
   isLoading: boolean;
   addSheet: (name?: string) => Promise<void>;
   switchSheet: (sheet: Sheet) => void;
-  updateCell: (id: string, data: Partial<CellData>) => void;
+  updateCell: (id: string, data: Partial<CellData>) => Promise<void>;
   setActiveCell: (id: string | null) => void;
   setSelection: (selection: Selection | null) => void;
 }
@@ -34,6 +35,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const pendingUpdates = useRef(new Map<string, CellData>());
+  const { toast } = useToast();
 
   // Load initial data
   useEffect(() => {
@@ -44,24 +46,42 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       })
       .catch(error => {
         console.error('[SpreadsheetContext] Failed to initialize:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load spreadsheet data',
+          variant: 'destructive',
+        });
       })
       .finally(() => {
         setIsLoading(false);
       });
-  }, []);
+  }, [toast]);
 
   // Debounced save function
   const debouncedSave = useDebounce(async () => {
-    if (pendingUpdates.current.size === 0) return;
+    if (!activeSheet || pendingUpdates.current.size === 0) return;
 
     try {
-      const app = getAppInstance();
-      await app.saveState();
+      const updates = Array.from(pendingUpdates.current.entries());
+      await Promise.all(
+        updates.map(([cellId, data]) =>
+          fetch(`/api/sheets/${activeSheet.getId()}/cells/${cellId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          })
+        )
+      );
       pendingUpdates.current.clear();
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to save updates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save changes',
+        variant: 'destructive',
+      });
     }
-  }, 500);
+  }, 300);
 
   const addSheet = useCallback(async (name?: string) => {
     try {
@@ -83,27 +103,36 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     }
   }, [sheets]);
 
-  const updateCell = useCallback((id: string, data: Partial<CellData>) => {
+  const updateCell = useCallback(async (id: string, data: Partial<CellData>) => {
     if (!activeSheet) return;
 
-    // Optimistically update local state
-    const updatedData: CellData = {
-      ...activeSheet.getCell(id),
-      ...data,
-      isModified: true,
-      lastModified: new Date().toISOString()
-    };
+    try {
+      // Optimistically update local state
+      const updatedData: CellData = {
+        ...activeSheet.getCell(id),
+        ...data,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      };
 
-    // Update local state immediately
-    activeSheet.setCell(id, updatedData);
-    setSheets(prev => [...prev]); // Trigger re-render
+      // Update local state immediately
+      activeSheet.setCell(id, updatedData);
+      setSheets(prev => [...prev]); // Trigger re-render
 
-    // Track pending update
-    pendingUpdates.current.set(id, updatedData);
+      // Track pending update
+      pendingUpdates.current.set(id, updatedData);
 
-    // Trigger debounced save
-    debouncedSave();
-  }, [activeSheet, debouncedSave]);
+      // Trigger debounced save
+      await debouncedSave();
+    } catch (error) {
+      console.error('[SpreadsheetContext] Cell update failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update cell',
+        variant: 'destructive',
+      });
+    }
+  }, [activeSheet, debouncedSave, toast]);
 
   const value = useMemo(() => ({
     sheets,

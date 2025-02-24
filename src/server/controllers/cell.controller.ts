@@ -1,7 +1,6 @@
 import { CacheService } from '../services/cache.service';
 import { Application } from '../models/application';
 import { CellData } from '@/lib/types';
-import { Cell } from '../models/cell';
 
 export class CellController {
   private static _instance: CellController;
@@ -20,7 +19,7 @@ export class CellController {
     return CellController._instance;
   }
 
-  async getValue(sheetId: number, cellId: string): Promise<CellData> {
+  async getValue(sheetId: number, cellId: string): Promise<CellData | null> {
     const workbook = this.application.getWorkbook();
     const sheet = workbook.getSheet(sheetId);
     if (!sheet) throw new Error('Sheet not found');
@@ -28,29 +27,61 @@ export class CellController {
     return sheet.getCell(cellId);
   }
 
-  async setValue(sheetId: number, cellId: string, data: CellData): Promise<void> {
+  async setValue(sheetId: number, cellId: string, value: any): Promise<void> {
     const workbook = this.application.getWorkbook();
     const sheet = workbook.getSheet(sheetId);
     if (!sheet) throw new Error('Sheet not found');
 
-    // Create or update cell
-    const [row, col] = this.parseCellId(cellId);
-    const cell = new Cell(sheetId, row, col);
-    cell.setValue(data.value);
-    
-    // Update sheet with new cell
     sheet.setCell(cellId, {
-      value: data.value,
+      value,
       isModified: true,
       lastModified: new Date().toISOString()
     });
-    
+
     // Cache the updated sheet
     await this.cacheService.cacheSheet(
-      workbook.getId(),
+      workbook.getName(),
       sheetId,
       sheet.toJSON()
     );
+  }
+
+  async updateCell(sheetId: number, cellId: string, data: Partial<CellData>): Promise<void> {
+    try {
+      const workbook = this.application.getWorkbook();
+      const sheet = workbook.getSheet(sheetId);
+      if (!sheet) throw new Error('Sheet not found');
+
+      // Get existing cell data and merge with updates
+      const existingData = sheet.getCell(cellId);
+      const updatedData: CellData = {
+        ...existingData,
+        ...data,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      };
+
+      // Update the cell
+      sheet.setCell(cellId, updatedData);
+
+      // Cache the individual cell
+      await this.cacheService.updateCell(
+        workbook.getName(),
+        sheetId,
+        cellId,
+        updatedData
+      );
+
+      // Also update the sheet cache
+      await this.cacheService.cacheSheet(
+        workbook.getName(),
+        sheetId,
+        sheet.toJSON()
+      );
+    } catch (error) {
+      console.error('[CellController] Update cell error:', error);
+      throw error;
+    }
   }
 
   async clearCell(sheetId: number, cellId: string): Promise<void> {
@@ -62,15 +93,9 @@ export class CellController {
     
     // Cache the updated sheet
     await this.cacheService.cacheSheet(
-      workbook.getId(),
+      workbook.getName(),
       sheetId,
       sheet.toJSON()
     );
-  }
-
-  private parseCellId(cellId: string): [number, string] {
-    const col = cellId.match(/[A-Z]+/)?.[0] || '';
-    const row = parseInt(cellId.match(/\d+/)?.[0] || '0');
-    return [row, col];
   }
 } 

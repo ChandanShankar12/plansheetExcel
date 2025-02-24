@@ -95,4 +95,38 @@ export async function DELETE(
       error: 'Failed to clear cell' 
     }, { status: 500 });
   }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { sheetId: string; cellId: string } }
+) {
+  try {
+    const sheetId = parseInt(params.sheetId);
+    if (isNaN(sheetId)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid sheet ID' 
+      }, { status: 400 });
+    }
+
+    const data = await req.json();
+    
+    // Update the cell
+    await cellController.updateCell(sheetId, params.cellId, data);
+
+    // Get the updated cell data
+    const updatedCell = await cellController.getValue(sheetId, params.cellId);
+
+    return NextResponse.json({
+      success: true,
+      data: updatedCell
+    });
+  } catch (error) {
+    console.error('[API] Cell update error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update cell'
+    }, { status: 500 });
+  }
 } 
