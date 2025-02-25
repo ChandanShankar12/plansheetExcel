@@ -1,13 +1,11 @@
-import { WorkbookController } from '@/server/controllers/workbook.controller';
-
-const workbookController = WorkbookController.instance;
+import { getWorkbookState } from '@/server/controllers/workbook.controller';
 
 export async function GET() {
   try {
-    const workbook = workbookController.getWorkbook();
+    const workbookData = getWorkbookState();
     return Response.json({
       success: true,
-      data: workbook.toJSON()
+      data: workbookData
     });
   } catch (error) {
     console.error('Failed to get workbook:', error);

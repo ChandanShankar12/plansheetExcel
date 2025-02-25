@@ -1,71 +1,31 @@
 import { Workbook } from './workbook';
-import { CacheService } from '../services/cache.service';
 
 export class Application {
-  private static _instance: Application | null = null;
   private _workbook: Workbook;
-  private cacheService: CacheService;
+  private _version: string;
+  private readonly _companyId: string;
   private _initialized: boolean = false;
 
-  private constructor() {
+  constructor(companyId: string = 'Coho.', version: string = '1.0.0') {
     console.log('[Application] Constructor called');
-    this.cacheService = CacheService.getInstance();
-    this._workbook = Workbook.getInstance();
+    this._companyId = companyId;
+    this._version = version;
+    this._workbook = new Workbook();
   }
 
-  public static getInstance(): Application {
-    if (!Application._instance) {
-      console.log('[Application] Creating new instance');
-      Application._instance = new Application();
-    }
-    return Application._instance;
-  }
-
-  public static get instance(): Application {
-    return Application.getInstance();
-  }
-
-  public static async initialize(): Promise<Application> {
-    console.log('[Application] Initializing application');
-    const app = Application.instance;
-    await app.initialize();
-    return app;
-  }
-
-  public getWorkbook(): Workbook {
-    return this._workbook;
-  }
-
+  /**
+   * Initialize the application and its components
+   */
   public async initialize(): Promise<void> {
     if (this._initialized) {
       console.log('[Application] Already initialized');
       return;
     }
 
-    console.log('[Application] Starting initialization sequence');
+    console.log('[Application] Starting initialization');
     try {
-      // Initialize cache service
-      await this.cacheService.initialize();
-      
-      // Try to load application state from cache
-      const cachedState = await this.cacheService.getApplicationState();
-      if (cachedState) {
-        console.log('[Application] Restoring from cached state');
-        await this.fromJSON(cachedState);
-      } else {
-        console.log('[Application] No cached state found, initializing with defaults');
-        // Initialize workbook with default state
-        await this._workbook.initialize();
-        
-        // Cache the initial state
-        try {
-          await this.cacheService.cacheApplicationState({
-            workbook: this._workbook.toJSON()
-          });
-        } catch (error) {
-          console.warn('[Application] Failed to cache initial state:', error);
-        }
-      }
+      // Initialize workbook
+      await this._workbook.initialize();
       
       this._initialized = true;
       console.log('[Application] Initialization complete');
@@ -75,32 +35,62 @@ export class Application {
     }
   }
 
-  public static async fromJSON(data: any): Promise<Application> {
-    console.log('[Application] Creating from JSON');
-    const app = Application.instance;
-    await app.fromJSON(data);
-    return app;
+  /**
+   * Get the application version
+   */
+  public get version(): string {
+    return this._version;
   }
 
-  public async fromJSON(data: any): Promise<void> {
+  /**
+   * Set the application version
+   */
+  public set version(value: string) {
+    this._version = value;
+  }
+
+  /**
+   * Get the company ID (readonly)
+   */
+  public get companyId(): string {
+    return this._companyId;
+  }
+
+  /**
+   * Get the workbook instance
+   */
+  public get workbook(): Workbook {
+    return this._workbook;
+  }
+
+  /**
+   * Convert application state to JSON
+   */
+  public toJSON() {
+    return {
+      version: this._version,
+      companyId: this._companyId,
+      workbook: this._workbook.toJSON(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Restore application state from JSON
+   */
+  public fromJSON(data: any): void {
     console.log('[Application] Restoring from JSON');
     try {
       if (data?.workbook) {
         this._workbook.fromJSON(data.workbook);
         console.log('[Application] Workbook state restored');
       }
-      this._initialized = true;
+      if (data?.version) {
+        this._version = data.version;
+      }
     } catch (error) {
       console.error('[Application] Failed to restore from JSON:', error);
       throw error;
     }
-  }
-
-  public toJSON() {
-    return {
-      workbook: this._workbook.toJSON(),
-      initialized: this._initialized,
-      timestamp: new Date().toISOString()
-    };
   }
 }

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SheetController } from '@/server/controllers/sheet.controller';
-import { CellController } from '@/server/controllers/cell.controller';
-
-const sheetController = SheetController.getInstance();
-const cellController = CellController.getInstance();
+import { getSheetById } from '@/server/controllers/sheet.controller';
+import { getAllCells, updateMultipleCells } from '@/server/controllers/cell.controller';
 
 export async function GET(
   req: NextRequest,
@@ -11,19 +8,27 @@ export async function GET(
 ) {
   try {
     const sheetId = parseInt(params.sheetId);
-    const sheet = await sheetController.getSheet(sheetId);
     
-    if (!sheet) {
+    if (isNaN(sheetId)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid sheet ID'
+      }, { status: 400 });
+    }
+    
+    try {
+      const cells = getAllCells(sheetId);
+      
+      return NextResponse.json({
+        success: true,
+        data: cells
+      });
+    } catch (error) {
       return NextResponse.json({
         success: false,
         error: 'Sheet not found'
       }, { status: 404 });
     }
-    
-    return NextResponse.json({
-      success: true,
-      data: sheet.getCellsData()
-    });
   } catch (error) {
     console.error('Failed to get cells:', error);
     return NextResponse.json({
@@ -48,23 +53,29 @@ export async function POST(
       }, { status: 400 });
     }
     
-    const sheet = await sheetController.getSheet(sheetId);
-    
-    if (!sheet) {
+    try {
+      // Check if sheet exists
+      getSheetById(sheetId);
+      
+      // Format updates into the expected structure
+      const cellUpdates: Record<string, any> = {};
+      for (const { id, data } of updates) {
+        cellUpdates[id] = data;
+      }
+      
+      // Update multiple cells at once
+      const result = updateMultipleCells(sheetId, cellUpdates);
+      
+      return NextResponse.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
       return NextResponse.json({
         success: false,
         error: 'Sheet not found'
       }, { status: 404 });
     }
-
-    for (const { id, data } of updates) {
-      await cellController.updateCell(sheetId, id, data);
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: sheet.toJSON()
-    });
   } catch (error) {
     console.error('Failed to update cells:', error);
     return NextResponse.json({

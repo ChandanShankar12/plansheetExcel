@@ -1,64 +1,77 @@
-import { Sheet } from '../models/sheet';
 import { Workbook } from '../models/workbook';
-import { CacheService } from '../services/cache.service';
+import { getApplication } from './application.controller';
 
-export class WorkbookController {
-  private static _instance: WorkbookController | null = null;
-  private readonly workbook: Workbook;
-  private readonly cacheService: CacheService;
+/**
+ * Get the workbook instance from the application
+ */
+export function getWorkbook(): Workbook {
+  const app = getApplication();
+  return app.workbook;
+}
 
-  private constructor() {
-    console.log('[WorkbookController] Constructor called');
-    this.workbook = Workbook.getInstance();
-    this.cacheService = CacheService.getInstance();
-    this.workbook.setCacheService(this.cacheService);
-  }
+/**
+ * Get all sheets from the workbook
+ */
+export function getSheets() {
+  const workbook = getWorkbook();
+  return workbook.getSheets();
+}
 
-  public static getInstance(): WorkbookController {
-    if (!WorkbookController._instance) {
-      console.log('[WorkbookController] Creating new instance');
-      WorkbookController._instance = new WorkbookController();
-    }
-    return WorkbookController._instance;
-  }
+/**
+ * Get a specific sheet by ID
+ */
+export function getSheet(id: number) {
+  const workbook = getWorkbook();
+  return workbook.getSheet(id);
+}
 
-  async initialize(): Promise<void> {
-    console.log('[WorkbookController] Initializing');
-    await this.workbook.initialize();
-  }
+/**
+ * Add a new sheet to the workbook
+ */
+export async function addSheet(name?: string) {
+  const workbook = getWorkbook();
+  return await workbook.addSheet(name);
+}
 
-  getName(): string {
-    return this.workbook.getName();
-  }
+/**
+ * Remove a sheet from the workbook
+ */
+export async function removeSheet(id: number) {
+  const workbook = getWorkbook();
+  await workbook.removeSheet(id);
+  return { success: true };
+}
 
-  async addSheet(name?: string): Promise<Sheet> {
-    console.log('[WorkbookController] Adding sheet:', { name });
-    return await this.workbook.addSheet(name);
-  }
+/**
+ * Get the workbook name
+ */
+export function getWorkbookName() {
+  const workbook = getWorkbook();
+  return workbook.getName();
+}
 
-  getSheets(): Sheet[] {
-    return this.workbook.getSheets();
-  }
+/**
+ * Set the workbook name
+ */
+export function setWorkbookName(name: string) {
+  const workbook = getWorkbook();
+  workbook.setName(name);
+  return { success: true };
+}
 
-  getSheet(id: number): Sheet | undefined {
-    return this.workbook.getSheet(id);
-  }
+/**
+ * Get workbook state as JSON
+ */
+export function getWorkbookState() {
+  const workbook = getWorkbook();
+  return workbook.toJSON();
+}
 
-  async removeSheet(id: number): Promise<void> {
-    console.log('[WorkbookController] Removing sheet:', { id });
-    await this.workbook.removeSheet(id);
-  }
-
-  async syncState(): Promise<void> {
-    console.log('[WorkbookController] Syncing state');
-    await this.workbook.syncState();
-  }
-
-  toJSON() {
-    return this.workbook.toJSON();
-  }
-
-  fromJSON(data: any): void {
-    this.workbook.fromJSON(data);
-  }
+/**
+ * Restore workbook from JSON data
+ */
+export function restoreWorkbookState(data: any) {
+  const workbook = getWorkbook();
+  workbook.fromJSON(data);
+  return { success: true };
 } 

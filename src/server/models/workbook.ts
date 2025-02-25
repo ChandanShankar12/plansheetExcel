@@ -1,41 +1,36 @@
 import { Sheet } from './sheet';
-import { CacheService } from '../services/cache.service';
 
 export class Workbook {
-  private static _instance: Workbook | null = null;
   private _name: string;
   private _sheets: Map<number, Sheet>;
   private _nextSheetId: number;
-  private cacheService: CacheService | null = null;
+  private _initialized: boolean = false;
 
-  constructor(name: string = 'default') {
-    console.log('[Workbook] Constructor called');
+  constructor(name: string = 'Untitled') {
+    console.log('[Workbook] New workbook created with name:', name);
     this._name = name;
     this._sheets = new Map<number, Sheet>();
     this._nextSheetId = 1;
-  }
-
-  public static getInstance(): Workbook {
-    if (!Workbook._instance) {
-      console.log('[Workbook] Creating new instance');
-      Workbook._instance = new Workbook();
-    }
-    return Workbook._instance;
-  }
-
-  public static get instance(): Workbook {
-    return Workbook.getInstance();
-  }
-
-  public setCacheService(cacheService: CacheService): void {
-    this.cacheService = cacheService;
   }
 
   public getName(): string {
     return this._name;
   }
 
+  public setName(name: string): void {
+    this._name = name;
+  }
+
+  public isInitialized(): boolean {
+    return this._initialized;
+  }
+
   public async initialize(): Promise<void> {
+    if (this._initialized) {
+      console.log('[Workbook] Already initialized');
+      return;
+    }
+
     console.log('[Workbook] Initializing workbook');
     
     // If no sheets exist, create a default sheet
@@ -43,6 +38,9 @@ export class Workbook {
       console.log('[Workbook] Creating default sheet');
       await this.addSheet('Sheet 1');
     }
+
+    this._initialized = true;
+    console.log('[Workbook] Initialization complete');
   }
 
   public async addSheet(name?: string): Promise<Sheet> {
@@ -52,20 +50,8 @@ export class Workbook {
     const sheet = new Sheet(sheetName, this._nextSheetId);
     this._sheets.set(this._nextSheetId, sheet);
     
-    // Cache the new sheet
-    if (this.cacheService) {
-      try {
-        await this.cacheService.cacheSheet(this._name, this._nextSheetId, sheet.toJSON());
-      } catch (error) {
-        console.warn('[Workbook] Failed to cache new sheet:', error);
-      }
-    }
-    
     // Increment sheet ID for next sheet
     this._nextSheetId++;
-    
-    // Sync workbook state
-    await this.syncState();
     
     return sheet;
   }
@@ -87,28 +73,14 @@ export class Workbook {
     }
     
     this._sheets.delete(id);
-    
-    // Sync workbook state
-    await this.syncState();
-  }
-
-  public async syncState(): Promise<void> {
-    console.log('[Workbook] Syncing state');
-    
-    if (this.cacheService) {
-      try {
-        await this.cacheService.cacheWorkbook(this._name, this.toJSON());
-      } catch (error) {
-        console.warn('[Workbook] Failed to sync state:', error);
-      }
-    }
   }
 
   public toJSON() {
     return {
       name: this._name,
       nextSheetId: this._nextSheetId,
-      sheets: this.getSheets().map(sheet => sheet.toJSON())
+      sheets: this.getSheets().map(sheet => sheet.toJSON()),
+      initialized: this._initialized
     };
   }
 
@@ -121,6 +93,10 @@ export class Workbook {
     
     if (data.nextSheetId) {
       this._nextSheetId = data.nextSheetId;
+    }
+    
+    if (data.initialized !== undefined) {
+      this._initialized = data.initialized;
     }
     
     // Clear existing sheets

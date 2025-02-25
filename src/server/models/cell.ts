@@ -1,5 +1,4 @@
 // src/server/models/Cell.ts
-import { CellStyle } from '@/lib/types';
 
 export interface CellData {
   value: any;
@@ -8,6 +7,21 @@ export interface CellData {
   isModified: boolean;
   lastModified: string;
   metadata?: Record<string, any>;
+}
+
+export interface CellStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string;
+  backgroundColor?: string;
+}
+
+export interface CellMetadata {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
 }
 
 export class Cell {

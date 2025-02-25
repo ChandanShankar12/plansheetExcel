@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { ApplicationController } from '@/server/controllers/application.controller';
+import { initializeApplication, getApplicationState } from '@/server/controllers/application.controller';
+import { getSheets, getWorkbookState } from '@/server/controllers/workbook.controller';
 
 export async function GET() {
   console.log('[API] Init endpoint called');
   try {
-    console.log('[API] Getting application controller');
-    const appController = ApplicationController.getInstance();
-    
     console.log('[API] Initializing application');
-    await appController.initialize();
+    await initializeApplication();
     
-    const workbookController = appController.getWorkbookController();
-    const sheets = workbookController.getSheets();
+    const sheets = getSheets();
+    const workbookData = getWorkbookState();
 
     console.log('[API] Initialization complete:', {
       sheetsCount: sheets.length,
@@ -21,7 +19,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        workbook: workbookController.toJSON(),
+        workbook: workbookData,
         sheets: sheets.map(s => s.toJSON())
       }
     });
