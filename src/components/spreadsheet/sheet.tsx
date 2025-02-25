@@ -1,9 +1,9 @@
 'use client';
 
 import { useSpreadsheet } from '@/context/spreadsheet-context';
-import { useState, useCallback, memo, useEffect } from 'react';
+import { useState, useCallback, memo, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Cell } from './cell';
+import Cell from './cell';
 import { Selection } from '@/lib/types';
 
 // Constants
@@ -23,10 +23,8 @@ interface CellCoords {
 interface GridRowProps {
   row: number;
   activeCell: string | null;
-  selection: Selection | null;  // Make selection nullable to match context
-  isDragging: boolean;
+  selection: Selection | null;
   onCellClick: (id: string) => void;
-  onCellDrag: (id: string) => void;
 }
 
 // Helper function to parse cell coordinates
@@ -82,10 +80,10 @@ const GridRow = memo(function GridRow({
   row, 
   activeCell,
   selection,
-  isDragging,
   onCellClick,
-  onCellDrag 
 }: GridRowProps) {
+  const { activeSheet, updateCell } = useSpreadsheet();
+  
   return (
     <div className="flex">
       <RowHeader row={row} />
@@ -93,15 +91,16 @@ const GridRow = memo(function GridRow({
         {COLUMNS.map(col => {
           const id = `${col}${row}`;
           const isSelected = selection?.start === id || selection?.end === id;
+          const cellData = activeSheet?.getCell(id) || null;
+          
           return (
             <Cell
               key={id}
               id={id}
+              data={cellData}
               isActive={activeCell === id}
-              isDragging={isDragging && isSelected}
-              onMouseEnter={() => onCellDrag(id)}
               onClick={() => onCellClick(id)}
-              style={{ width: CELL_WIDTH, height: CELL_HEIGHT }}
+              onChange={(value) => updateCell(id, { value })}
             />
           );
         })}
@@ -121,24 +120,13 @@ export const Sheet = memo(function Sheet() {
     setSelection 
   } = useSpreadsheet();
 
-  const [isDragging, setIsDragging] = useState(false);
-
   const handleCellClick = useCallback((id: string) => {
     setActiveCell(id);
     setSelection(null);
-    setIsDragging(true);
   }, [setActiveCell, setSelection]);
 
-  const handleCellDrag = useCallback((id: string) => {
-    if (!isDragging || !activeCell) return;
-    setSelection({
-      start: activeCell,
-      end: id
-    });
-  }, [isDragging, activeCell, setSelection]);
-
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
+    // Handle mouse up event
   }, []);
 
   useEffect(() => {
@@ -178,9 +166,7 @@ export const Sheet = memo(function Sheet() {
                 row={row}
                 activeCell={activeCell}
                 selection={selection}
-                isDragging={isDragging}
                 onCellClick={handleCellClick}
-                onCellDrag={handleCellDrag}
               />
             ))}
           </div>

@@ -1,20 +1,41 @@
 import { Application } from '@/server/models/application';
 
-// Create singleton instance outside of React's render cycle
+// Singleton instance of the application
 let appInstance: Application | null = null;
 
-export async function initializeApp() {
+/**
+ * Initialize the application
+ */
+export async function initializeApp(): Promise<Application> {
   if (!appInstance) {
-    console.log('[AppInstance] Initializing application');
-    appInstance = await Application.initialize();
+    try {
+      // Initialize from API
+      const response = await fetch('/api/init');
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to initialize application');
+      }
+      
+      // Create application instance
+      appInstance = await Application.initialize();
+    } catch (error) {
+      console.error('[AppInstance] Failed to initialize:', error);
+      // Create default application
+      appInstance = await Application.initialize();
+    }
   }
+  
   return appInstance;
 }
 
-export function getAppInstance() {
+/**
+ * Get the application instance
+ */
+export function getAppInstance(): Application {
   if (!appInstance) {
-    console.warn('[AppInstance] Getting instance before initialization');
-    appInstance = Application.instance;
+    throw new Error('Application not initialized. Call initializeApp() first.');
   }
+  
   return appInstance;
 } 

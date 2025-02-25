@@ -1,88 +1,108 @@
 import { createClient } from 'redis';
-import { config } from '@/config/env.config';
 
-// Define global type for Redis client
-declare global {
-  var redis: ReturnType<typeof createClient> | undefined;
-}
+/**
+ * Redis Client Singleton
+ * Manages a single instance of Redis client throughout the application
+ */
+class RedisClientSingleton {
+  private static instance: ReturnType<typeof createClient> | null = null;
+  private static isConnected: boolean = false;
+  private static isConnecting: boolean = false;
 
-// Create Redis client if it doesn't exist
-if (!global.redis) {
-  try {
-    global.redis = createClient({
-      url: config.redis.url,
-      socket: {
-        reconnectStrategy: (retries) => {
-          if (retries > 20) {
-            console.error('[Redis] Max reconnection attempts reached');
-            return new Error('Max reconnection attempts reached');
-          }
-          const delay = Math.min(retries * 100, 3000);
-          console.log(`[Redis] Reconnecting in ${delay}ms...`);
-          return delay;
-        }
-      }
-    });
+  /**
+   * Get the Redis client instance
+   * Creates a new instance if one doesn't exist
+   */
+  public static getClient(): ReturnType<typeof createClient> | null {
+    if (!this.instance && !this.isConnecting) {
+      this.initialize();
+    }
+    return this.instance;
+  }
 
-    // Handle Redis events
-    global.redis.on('connect', () => {
-      console.log('[Redis] Client connected successfully');
-    });
+  /**
+   * Check if Redis is connected
+   */
+  public static isRedisConnected(): boolean {
+    return this.isConnected;
+  }
 
-    global.redis.on('error', (error) => {
-      console.error('[Redis] Client error:', error);
-    });
+  /**
+   * Initialize the Redis client
+   * Reads configuration from environment variables
+   */
+  private static initialize(): void {
+    try {
+      this.isConnecting = true;
+      console.log('[Redis] Creating client...');
+      
+      // Read Redis configuration from environment variables
+      const host = process.env.REDIS_HOST || 'redis-14882.c80.us-east-1-2.ec2.redns.redis-cloud.com';
+      const port = parseInt(process.env.REDIS_PORT || '14882');
+      const username = process.env.REDIS_USERNAME || 'default';
+      const password = process.env.REDIS_PASSWORD || 'OzY2aSx25plG8Qwxaq3nIqnK0C1AlNBF';
+      
+      console.log(`[Redis] Connecting to ${host}:${port} with username: ${username}`);
 
-    global.redis.on('reconnecting', () => {
-      console.log('[Redis] Client reconnecting...');
-    });
+      this.instance = createClient({
+        username,
+        password,
+        socket: {
+          host,
+          port,
+          reconnectStrategy: (retries) => {
+            console.log(`[Redis] Reconnection attempt ${retries + 1}`);
+            return Math.min(retries * 500, 5000);
+          },
+        },
+      });
 
-    // Connect to Redis
-    global.redis.connect().catch((err) => {
-      console.error('[Redis] Failed to connect:', err);
-    });
+      // Set up event handlers with detailed logging
+      this.instance.on('connect', () => {
+        console.log('[Redis] Connected successfully');
+        this.isConnected = true;
+      });
 
-    // Handle graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('[Redis] Shutting down gracefully...');
-      global.redis?.quit().catch(console.error);
-    });
+      this.instance.on('error', (err) => {
+        console.error('[Redis] Error:', err);
+        this.isConnected = false;
+      });
 
-    process.on('SIGINT', () => {
-      console.log('[Redis] Shutting down gracefully...');
-      global.redis?.quit().catch(console.error);
-    });
+      this.instance.on('end', () => {
+        console.log('[Redis] Connection closed');
+        this.isConnected = false;
+      });
 
-  } catch (error) {
-    console.error('[Redis] Failed to create client:', error);
-    if (config.isDev) {
-      console.warn('[Redis] Using mock client in development');
-      global.redis = createMockRedisClient();
-    } else {
-      throw error;
+      console.log('[Redis] Attempting to connect...');
+      // Connect to Redis in the background
+      this.instance.connect()
+        .then(() => {
+          console.log('[Redis] Connection established');
+          this.isConnected = true;
+          this.isConnecting = false;
+        })
+        .catch((err) => {
+          console.error('[Redis] Connection failed:', err);
+          console.error('[Redis] Connection details:', { host, port, username: username ? '(set)' : '(not set)', password: password ? '(set)' : '(not set)' });
+          this.isConnected = false;
+          this.isConnecting = false;
+          this.instance = null;
+        });
+    } catch (error) {
+      console.error('[Redis] Initialization error:', error);
+      this.isConnected = false;
+      this.isConnecting = false;
+      this.instance = null;
     }
   }
 }
 
-function createMockRedisClient() {
-  const storage = new Map<string, string>();
-  return {
-    connect: async () => {},
-    quit: async () => {},
-    on: () => {},
-    set: async (key: string, value: string) => {
-      storage.set(key, value);
-      return 'OK';
-    },
-    get: async (key: string) => storage.get(key) || null,
-    del: async (key: string) => {
-      storage.delete(key);
-      return 1;
-    },
-    keys: async (pattern: string) => Array.from(storage.keys())
-  } as unknown as ReturnType<typeof createClient>;
-}
+/**
+ * Get the Redis client instance
+ */
+export const getRedisClient = () => RedisClientSingleton.getClient();
 
-// Export the singleton Redis client
-export const redis = global.redis;
-
+/**
+ * Check if Redis is connected
+ */
+export const isRedisConnected = () => RedisClientSingleton.isRedisConnected();

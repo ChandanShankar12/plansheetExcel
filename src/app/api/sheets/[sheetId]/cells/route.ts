@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SheetController } from '@/server/controllers/sheet.controller';
 import { CellController } from '@/server/controllers/cell.controller';
 
-const sheetController = SheetController.instance;
-const cellController = CellController.instance;
+const sheetController = SheetController.getInstance();
+const cellController = CellController.getInstance();
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +12,14 @@ export async function GET(
   try {
     const sheetId = parseInt(params.sheetId);
     const sheet = await sheetController.getSheet(sheetId);
+    
+    if (!sheet) {
+      return NextResponse.json({
+        success: false,
+        error: 'Sheet not found'
+      }, { status: 404 });
+    }
+    
     return NextResponse.json({
       success: true,
       data: sheet.getCellsData()
@@ -32,10 +40,25 @@ export async function POST(
   try {
     const updates = await req.json();
     const sheetId = parseInt(params.sheetId);
+    
+    if (isNaN(sheetId)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid sheet ID'
+      }, { status: 400 });
+    }
+    
     const sheet = await sheetController.getSheet(sheetId);
+    
+    if (!sheet) {
+      return NextResponse.json({
+        success: false,
+        error: 'Sheet not found'
+      }, { status: 404 });
+    }
 
     for (const { id, data } of updates) {
-      await cellController.setValue(sheetId, id, data);
+      await cellController.updateCell(sheetId, id, data);
     }
 
     return NextResponse.json({

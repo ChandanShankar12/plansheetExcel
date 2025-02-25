@@ -1,32 +1,27 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { initializeApp, getAppInstance } from '@/lib/app-instance';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Sheet } from '@/server/models/sheet';
 import { Selection, CellData } from '@/lib/types';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 
-// Initialize app and get workbook
-const initializeSheets = async () => {
-  const app = await initializeApp();
-  return app.getWorkbook().getSheets();
-};
-
+// Define the context type
 interface SpreadsheetContextType {
   sheets: Sheet[];
   activeSheet: Sheet | null;
   activeCell: string | null;
   selection: Selection | null;
-  isLoading: boolean;
-  addSheet: (name?: string) => Promise<void>;
-  switchSheet: (sheet: Sheet) => void;
-  updateCell: (id: string, data: Partial<CellData>) => Promise<void>;
-  setActiveCell: (id: string | null) => void;
+  isTransitioning: boolean;
+  setActiveSheet: (sheet: Sheet | null) => void;
+  setActiveCell: (cellId: string | null) => void;
   setSelection: (selection: Selection | null) => void;
+  addSheet: (name?: string) => Promise<void>;
+  updateCell: (cellId: string, data: Partial<CellData>) => Promise<void>;
+  switchSheet: (sheet: Sheet) => void;
 }
 
-const SpreadsheetContext = createContext<SpreadsheetContextType | null>(null);
+const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
 
 export function SpreadsheetProvider({ children }: { children: React.ReactNode }) {
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -34,98 +29,150 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const pendingUpdates = useRef(new Map<string, CellData>());
   const { toast } = useToast();
 
-  // Load initial data
+  // Load sheets from API or create default
   useEffect(() => {
-    initializeSheets()
-      .then(initialSheets => {
-        setSheets(initialSheets);
-        setActiveSheet(initialSheets[0] || null);
-      })
-      .catch(error => {
-        console.error('[SpreadsheetContext] Failed to initialize:', error);
+    setIsLoading(true);
+    (async () => {
+      try {
+        // Try to fetch sheets from API
+        const resp = await fetch('/api/init');
+        const data = await resp.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to initialize application');
+        }
+
+        // Parse sheets from response
+        const loadedSheets = data.data?.sheets?.map((sheetData: any) => 
+          Sheet.fromJSON(sheetData)
+        ) || [];
+        
+        if (loadedSheets.length > 0) {
+          setSheets(loadedSheets);
+          setActiveSheet(loadedSheets[0]);
+        } else {
+          // Create default sheet if none returned
+          throw new Error('No sheets returned from server');
+        }
+      } catch (error) {
+        console.error('[SpreadsheetContext] Failed to load sheets:', error);
+        
+        // Create a default sheet if loading fails
+        const defaultSheet = new Sheet('Sheet 1', 1);
+        setSheets([defaultSheet]);
+        setActiveSheet(defaultSheet);
+        
         toast({
-          title: 'Error',
-          description: 'Failed to load spreadsheet data',
-          variant: 'destructive',
+          title: 'Using default sheet',
+          description: 'Could not load sheets from server',
+          variant: 'warning',
         });
-      })
-      .finally(() => {
+      } finally {
         setIsLoading(false);
-      });
+      }
+    })();
   }, [toast]);
 
-  // Debounced save function
-  const debouncedSave = useDebounce(async () => {
-    if (!activeSheet || pendingUpdates.current.size === 0) return;
-
+  // Debounced save function for cell updates
+  const debouncedSave = useDebounce(async (sheetId: number, cellId: string, data: CellData) => {
     try {
-      const updates = Array.from(pendingUpdates.current.entries());
-      await Promise.all(
-        updates.map(([cellId, data]) =>
-          fetch(`/api/sheets/${activeSheet.getId()}/cells/${cellId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          })
-        )
-      );
-      pendingUpdates.current.clear();
+      await fetch(`/api/sheets/${sheetId}/cells/${cellId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
     } catch (error) {
-      console.error('[SpreadsheetContext] Failed to save updates:', error);
+      console.error('[SpreadsheetContext] Failed to save cell:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save changes',
+        description: 'Failed to save cell changes',
         variant: 'destructive',
       });
     }
-  }, 300);
+  }, 500);
 
+  // Add a new sheet
   const addSheet = useCallback(async (name?: string) => {
     try {
-      const workbook = getAppInstance().getWorkbook();
-      const newSheet = workbook.addSheet(name);
-      setSheets(workbook.getSheets());
-      setActiveSheet(newSheet);
+      const sheetName = name || `Sheet ${sheets.length + 1}`;
       
-      // Save state after modification
-      await getAppInstance().saveState();
+      // Create sheet on server
+      const response = await fetch('/api/sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: sheetName })
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create sheet');
+      }
+      
+      // Create local sheet from response
+      const newSheet = Sheet.fromJSON(data.data);
+      
+      setSheets(prev => [...prev, newSheet]);
+      setActiveSheet(newSheet);
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to add sheet:', error);
+      
+      // Fallback: create sheet locally if API fails
+      const newSheet = new Sheet(name || `Sheet ${sheets.length + 1}`, Date.now());
+      setSheets(prev => [...prev, newSheet]);
+      setActiveSheet(newSheet);
+      
+      toast({
+        title: 'Warning',
+        description: 'Sheet created locally only - changes may not persist',
+        variant: 'warning',
+      });
     }
-  }, []);
+  }, [sheets, toast]);
 
+  // Switch to a different sheet
   const switchSheet = useCallback((sheet: Sheet) => {
-    if (sheets.includes(sheet)) {
+    if (sheets.some(s => s.getId() === sheet.getId())) {
       setActiveSheet(sheet);
+      setActiveCell(null);
+      setSelection(null);
     }
   }, [sheets]);
 
-  const updateCell = useCallback(async (id: string, data: Partial<CellData>) => {
+  // Update a cell
+  const updateCell = useCallback(async (cellId: string, data: Partial<CellData>) => {
     if (!activeSheet) return;
-
+    
     try {
-      // Optimistically update local state
-      const updatedData: CellData = {
-        ...activeSheet.getCell(id),
+      // Get current cell data or create default
+      const currentCell = activeSheet.getCell(cellId) || {
+        value: '',
+        formula: '',
+        style: {},
+        isModified: false,
+        lastModified: new Date().toISOString()
+      };
+      
+      // Create updated cell data
+      const updatedCellData: CellData = {
+        ...currentCell,
         ...data,
         isModified: true,
         lastModified: new Date().toISOString()
       };
-
-      // Update local state immediately
-      activeSheet.setCell(id, updatedData);
-      setSheets(prev => [...prev]); // Trigger re-render
-
-      // Track pending update
-      pendingUpdates.current.set(id, updatedData);
-
-      // Trigger debounced save
-      await debouncedSave();
+      
+      // Update cell in the active sheet
+      activeSheet.setCell(cellId, updatedCellData);
+      
+      // Force re-render by creating a new array
+      setSheets(prev => [...prev]);
+      
+      // Save to server in the background
+      debouncedSave(activeSheet.getId(), cellId, updatedCellData);
     } catch (error) {
-      console.error('[SpreadsheetContext] Cell update failed:', error);
+      console.error('[SpreadsheetContext] Failed to update cell:', error);
       toast({
         title: 'Error',
         description: 'Failed to update cell',
@@ -134,34 +181,22 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     }
   }, [activeSheet, debouncedSave, toast]);
 
-  const value = useMemo(() => ({
-    sheets,
-    activeSheet,
-    activeCell,
-    selection,
-    isLoading,
-    addSheet,
-    switchSheet,
-    updateCell,
-    setActiveCell,
-    setSelection
-  }), [
-    sheets,
-    activeSheet,
-    activeCell,
-    selection,
-    isLoading,
-    addSheet,
-    switchSheet,
-    updateCell
-  ]);
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <SpreadsheetContext.Provider value={value}>
+    <SpreadsheetContext.Provider
+      value={{
+        sheets,
+        activeSheet,
+        activeCell,
+        selection,
+        isTransitioning: isLoading,
+        setActiveSheet,
+        setActiveCell,
+        setSelection,
+        addSheet,
+        updateCell,
+        switchSheet,
+      }}
+    >
       {children}
     </SpreadsheetContext.Provider>
   );
@@ -169,6 +204,8 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
 
 export function useSpreadsheet() {
   const context = useContext(SpreadsheetContext);
-  if (!context) throw new Error('useSpreadsheet must be used within SpreadsheetProvider');
+  if (!context) {
+    throw new Error('useSpreadsheet must be used within SpreadsheetProvider');
+  }
   return context;
 }
