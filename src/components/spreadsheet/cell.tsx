@@ -1,99 +1,102 @@
 'use client';
 
-import { useSpreadsheet } from '@/context/spreadsheet-context';
-import { useState, useRef, useEffect, memo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CellData } from '@/lib/types';
+import styles from '../../styles/cell.module.css';
+import { useSpreadsheet } from '@/context/spreadsheet-context';
 import { useToast } from '@/hooks/use-toast';
 
 interface CellProps {
   id: string;
-  isActive?: boolean;
-  isDragging?: boolean;
-  onClick?: () => void;
-  onMouseEnter?: () => void;
-  onDoubleClick?: () => void;
-  style?: React.CSSProperties;
+  data: CellData | null;
+  isActive: boolean;
+  onClick: () => void;
+  onChange: (value: string) => void;
 }
 
-export const Cell = memo(function Cell({
-  id,
-  isActive,
-  isDragging,
-  onClick,
-  onMouseEnter,
-  onDoubleClick,
-  style
-}: CellProps) {
-  const { activeSheet, updateCell } = useSpreadsheet();
-  const [value, setValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+const Cell: React.FC<CellProps> = ({ id, data, isActive, onClick, onChange }) => {
+  // Create a default empty cell if data is null
+  const cellData = data || { 
+    value: '', 
+    formula: '', 
+    style: {}, 
+    isModified: false, 
+    lastModified: new Date().toISOString() 
+  };
 
+  const [editValue, setEditValue] = useState(cellData.value?.toString() || '');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { updateCell } = useSpreadsheet();
+  const { toast } = useToast();
+  const prevValueRef = useRef(cellData.value);
+
+  // Update local state when cell data changes from props
   useEffect(() => {
-    if (!activeSheet) return;
-    const cellData = activeSheet.getCell(id);
-    setValue(cellData.value || '');
-  }, [id, activeSheet]);
+    const newValue = cellData.value?.toString() || '';
+    if (prevValueRef.current !== newValue) {
+      setEditValue(newValue);
+      prevValueRef.current = newValue;
+    }
+  }, [cellData.value]);
+
+  // Focus input when cell becomes active
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isActive]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditValue(e.target.value);
+  }, []);
 
   const handleBlur = useCallback(async () => {
-    if (!isEditing) return;
-    
-    try {
-      await updateCell(id, { value });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update cell',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsEditing(false);
+    // Only update if value has changed
+    if (editValue !== (cellData.value?.toString() || '')) {
+      try {
+        await updateCell(id, { value: editValue });
+        onChange(editValue);
+      } catch (error) {
+        toast({
+          title: 'Error updating cell',
+          description: error instanceof Error ? error.message : 'An unknown error occurred',
+          variant: 'destructive',
+        });
+      }
     }
-  }, [id, value, updateCell, isEditing, toast]);
+  }, [id, editValue, cellData.value, updateCell, onChange, toast]);
 
-  const handleKeyDown = useCallback(async (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      await handleBlur();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
+      handleBlur();
     }
   }, [handleBlur]);
 
   return (
-    <div
-      className={`
-        w-[100px] h-[24px] 
-        border-r border-b border-[#e1e3e6]
-        bg-white hover:bg-[#f8f9fa]
-        relative select-none
-        ${isActive ? 'z-10 outline outline-1 outline-[#1a73e8]' : ''}
-        ${isDragging ? 'bg-[#e8f0fe]' : ''}
-      `}
-      style={style}
-      onMouseEnter={onMouseEnter}
+    <div 
+      className={`${styles.cell} ${isActive ? styles.active : ''}`} 
       onClick={onClick}
-      onDoubleClick={() => {
-        setIsEditing(true);
-        onDoubleClick?.();
-      }}
+      data-cell-id={id}
     >
-      {isEditing ? (
+      {isActive ? (
         <input
           ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          type="text"
+          value={editValue}
+          onChange={handleChange}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="absolute inset-0 w-full h-full px-[3px] outline-none bg-white text-[13px]"
-          autoFocus
+          className={styles.cellInput}
         />
       ) : (
-        <div className="px-[3px] py-[1px] h-full truncate text-[13px] leading-[22px]">
-          {value}
+        <div className={styles.cellContent}>
+          {cellData.value?.toString() || ''}
         </div>
       )}
     </div>
   );
-}); 
+};
+
+// Use React.memo to prevent unnecessary re-renders
+export default React.memo(Cell); 

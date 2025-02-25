@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SheetController } from '@/server/controllers/sheet.controller';
-
-const sheetController = SheetController.instance;
+import { ApplicationController } from '@/server/controllers/application.controller';
 
 // Interface for cell updates
 interface CellData {
@@ -26,36 +25,56 @@ interface PatchRequestBody {
 
 // POST: Create a new sheet
 export async function POST(req: NextRequest) {
+  console.log('[API/Sheets] POST request received');
   try {
-    const { name } = await req.json();
+    // Initialize application first
+    const appController = ApplicationController.getInstance();
+    await appController.initialize();
+    
+    // Now get the sheet controller
+    const sheetController = SheetController.getInstance();
+    
+    const body = await req.json();
+    const name = body.name || `Sheet ${Date.now()}`;
+    
+    console.log('[API/Sheets] Creating sheet with name:', name);
     const sheet = await sheetController.createSheet(name);
-
+    
+    console.log('[API/Sheets] Sheet created successfully:', sheet.getId());
     return NextResponse.json({
       success: true,
       data: sheet.toJSON()
     });
   } catch (error) {
-    console.error('Failed to create sheet:', error);
+    console.error('[API/Sheets] POST failed:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to create sheet' 
+      error: error instanceof Error ? error.message : 'Failed to create sheet'
     }, { status: 500 });
   }
 }
 
 // GET: List all sheets
 export async function GET() {
+  console.log('[API/Sheets] GET request received');
   try {
+    // Initialize application first
+    const appController = ApplicationController.getInstance();
+    await appController.initialize();
+    
+    // Now get the sheet controller
+    const sheetController = SheetController.getInstance();
+    
     const sheets = await sheetController.getAllSheets();
     return NextResponse.json({
       success: true,
       data: sheets.map(sheet => sheet.toJSON())
     });
   } catch (error) {
-    console.error('Failed to get sheets:', error);
+    console.error('[API/Sheets] GET failed:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to get sheets' 
+      error: error instanceof Error ? error.message : 'Failed to get sheets'
     }, { status: 500 });
   }
 }

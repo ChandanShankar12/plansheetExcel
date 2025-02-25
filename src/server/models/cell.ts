@@ -1,11 +1,21 @@
 // src/server/models/Cell.ts
-import { CellStyle, CellData } from '@/lib/types';
+import { CellStyle } from '@/lib/types';
+
+export interface CellData {
+  value: any;
+  formula: string;
+  style: CellStyle;
+  isModified: boolean;
+  lastModified: string;
+  metadata?: Record<string, any>;
+}
 
 export class Cell {
   private _value: any;
   private _formula: string;
   private _isModified: boolean;
   public style: CellStyle;
+  private _lastModified: string;
 
   constructor(
     private readonly sheetId: number,
@@ -15,6 +25,7 @@ export class Cell {
     this._value = '';
     this._formula = '';
     this._isModified = false;
+    this._lastModified = new Date().toISOString();
     this.style = {};
   }
 
@@ -25,6 +36,7 @@ export class Cell {
   setValue(value: any): void {
     this._value = value;
     this._isModified = true;
+    this._lastModified = new Date().toISOString();
   }
 
   getFormula(): string {
@@ -34,6 +46,7 @@ export class Cell {
   setFormula(formula: string): void {
     this._formula = formula;
     this._isModified = true;
+    this._lastModified = new Date().toISOString();
   }
 
   isModifiedCell(): boolean {
@@ -50,7 +63,7 @@ export class Cell {
       formula: this._formula,
       style: this.style,
       isModified: this._isModified,
-      lastModified: new Date().toISOString()
+      lastModified: this._lastModified
     };
   }
 
@@ -70,6 +83,7 @@ export class Cell {
     clonedCell._formula = this._formula;
     clonedCell.style = { ...this.style };
     clonedCell._isModified = this._isModified;
+    clonedCell._lastModified = this._lastModified;
     return clonedCell;
   }
 
@@ -79,6 +93,21 @@ export class Cell {
     cell._formula = data.formula;
     cell.style = data.style || {};
     cell._isModified = data.isModified || false;
+    cell._lastModified = data.lastModified || new Date().toISOString();
     return cell;
+  }
+
+  updateProperties(updates: Partial<CellData>): void {
+    if (updates.value !== undefined) {
+      this._value = updates.value;
+    }
+    if (updates.formula !== undefined) {
+      this._formula = updates.formula;
+    }
+    if (updates.style !== undefined) {
+      this.style = { ...this.style, ...updates.style };
+    }
+    this._isModified = true;
+    this._lastModified = new Date().toISOString();
   }
 }
