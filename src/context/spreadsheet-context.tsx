@@ -39,7 +39,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     (async () => {
       try {
         // Try to fetch sheets from API
-        const resp = await fetch('/api/__init__');
+        const resp = await fetch('/api/init');
         const data = await resp.json();
 
         if (!data.success) {

@@ -37,6 +37,14 @@ export class Workbook {
     if (this._sheets.size === 0) {
       console.log('[Workbook] Creating default sheet');
       await this.addSheet('Sheet 1');
+      
+      // Ensure the first sheet has ID 1
+      if (!this._sheets.has(1)) {
+        console.log('[Workbook] Ensuring sheet with ID 1 exists');
+        const sheet = new Sheet('Sheet 1', 1);
+        this._sheets.set(1, sheet);
+        this._nextSheetId = Math.max(this._nextSheetId, 2);
+      }
     }
 
     this._initialized = true;

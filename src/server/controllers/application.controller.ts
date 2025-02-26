@@ -49,10 +49,9 @@ export async function initializeApplication() {
  */
 export function getApplication() {
   if (!initialized) {
-    console.warn('[ApplicationController] Application not initialized, initializing now');
-    // Return the instance but also trigger initialization
-    initializeApplication().catch(err => {
-      console.error('[ApplicationController] Failed to initialize application:', err);
+    console.log('[ApplicationController] Application not initialized, initializing now');
+    initializeApplication().catch(error => {
+      console.error('[ApplicationController] Failed to initialize application:', error);
     });
   }
   return app;

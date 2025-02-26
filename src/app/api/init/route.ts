@@ -40,4 +40,4 @@ export async function GET() {
       error: error instanceof Error ? error.message : 'Failed to initialize application' 
     }, { status: 500 });
   }
-}
+} 

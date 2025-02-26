@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getWorkbookState, cacheWorkbook } from '@/server/controllers/workbook.controller';
+import { getWorkbookState } from '@/server/controllers/workbook.controller';
+import { cacheWorkbook } from '@/server/services/cache.service';
 
 export async function POST(request: Request) {
   try {

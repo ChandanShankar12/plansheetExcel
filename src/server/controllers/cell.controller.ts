@@ -49,29 +49,41 @@ export async function getCell(sheetId: number, cellId: string) {
 export function updateCell(sheetId: number, cellId: string, updates: Partial<CellData>) {
   const sheet = getSheet(sheetId);
   if (!sheet) {
+    console.error(`[CellController] Sheet with ID ${sheetId} not found for cell update`);
     throw new Error(`Sheet with ID ${sheetId} not found`);
   }
   
-  sheet.updateCell(cellId, updates);
-  const updatedCell = sheet.getCell(cellId);
-  
-  if (updatedCell) {
-    const cellData = updatedCell.toCellData();
-    
-    // Cache the updated cell
-    cacheCellData(sheetId, cellId, cellData).catch(error => {
-      console.warn(`[CellController] Failed to cache cell ${cellId} after update:`, error);
-    });
-    
-    // Cache the updated sheet
-    cacheSheet(sheetId, sheet.toJSON()).catch(error => {
-      console.warn(`[CellController] Failed to cache sheet ${sheetId} after cell update:`, error);
-    });
-    
-    return cellData;
+  // Get or create the cell
+  let cell = sheet.getCell(cellId);
+  if (!cell) {
+    cell = sheet.createCell(cellId);
   }
   
-  return null;
+  // Apply updates
+  if (updates.value !== undefined) {
+    cell.setValue(updates.value);
+  }
+  
+  if (updates.formula !== undefined) {
+    cell.setFormula(updates.formula);
+  }
+  
+  if (updates.style) {
+    cell.setStyle(updates.style);
+  }
+  
+  // Cache the updated cell
+  const cellData = cell.toCellData();
+  cacheCellData(sheetId, cellId, cellData).catch(error => {
+    console.warn(`[CellController] Failed to cache cell ${cellId} after update:`, error);
+  });
+  
+  // Also cache the updated sheet
+  cacheSheet(sheetId, sheet.toJSON()).catch(error => {
+    console.warn(`[CellController] Failed to cache sheet ${sheetId} after cell update:`, error);
+  });
+  
+  return cellData;
 }
 
 /**
