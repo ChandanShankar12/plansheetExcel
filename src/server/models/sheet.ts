@@ -54,18 +54,42 @@ export class Sheet {
   updateCell(id: string, updates: Partial<CellData>): void {
     const currentCell = this._cells.get(id);
     if (currentCell) {
+      // Ensure style is properly merged with defaults
+      const style = {
+        bold: (updates.style?.bold !== undefined) ? updates.style.bold : (currentCell.style?.bold || false),
+        italic: (updates.style?.italic !== undefined) ? updates.style.italic : (currentCell.style?.italic || false),
+        underline: (updates.style?.underline !== undefined) ? updates.style.underline : (currentCell.style?.underline || false),
+        color: (updates.style?.color !== undefined) ? updates.style.color : (currentCell.style?.color || null),
+        backgroundColor: (updates.style?.backgroundColor !== undefined) ? updates.style.backgroundColor : (currentCell.style?.backgroundColor || null),
+        fontSize: (updates.style?.fontSize !== undefined) ? updates.style.fontSize : (currentCell.style?.fontSize || 12),
+        fontFamily: (updates.style?.fontFamily !== undefined) ? updates.style.fontFamily : (currentCell.style?.fontFamily || 'Arial'),
+        alignment: (updates.style?.alignment !== undefined) ? updates.style.alignment : (currentCell.style?.alignment || 'left')
+      };
+      
       this._cells.set(id, {
         ...currentCell,
         ...updates,
+        style, // Use the complete style object
         isModified: true,
         lastModified: new Date().toISOString()
       });
     } else {
-      // Create a new cell if it doesn't exist
+      // Create a new cell if it doesn't exist with complete style
+      const style = {
+        bold: updates.style?.bold || false,
+        italic: updates.style?.italic || false,
+        underline: updates.style?.underline || false,
+        color: updates.style?.color || null,
+        backgroundColor: updates.style?.backgroundColor || null,
+        fontSize: updates.style?.fontSize || 12,
+        fontFamily: updates.style?.fontFamily || 'Arial',
+        alignment: updates.style?.alignment || 'left'
+      };
+      
       this._cells.set(id, {
         value: updates.value || '',
         formula: updates.formula || '',
-        style: updates.style || {},
+        style,
         isModified: true,
         lastModified: new Date().toISOString()
       });
@@ -112,25 +136,48 @@ export class Sheet {
   }
 
   // Convert to JSON
-  toJSON(): SheetData {
-    return {
+  toJSON(includeFullCellData: boolean = true): SheetData {
+    console.log(`[Sheet] Converting sheet ${this._id} to JSON with includeFullCellData=${includeFullCellData}`);
+    
+    const cellsData = Object.fromEntries(this._cells);
+    const cellIds = Object.keys(cellsData);
+    
+    console.log(`[Sheet] Sheet ${this._id} has ${cellIds.length} cell IDs`);
+    
+    const sheetData: SheetData = {
       id: this._id,
       name: this._name,
-      cells: Object.fromEntries(this._cells),
-      workbookId: this._workbookId?.toString() || null,
+      cells: includeFullCellData ? cellsData : {},
+      cellIds: cellIds,
     };
+    
+    // Only include workbookId if it exists
+    if (this._workbookId !== null) {
+      sheetData.workbookId = this._workbookId?.toString() || null;
+    }
+    
+    return sheetData;
   }
 
   // Create from JSON
   static fromJSON(data: SheetData): Sheet {
+    console.log(`[Sheet] Creating sheet from JSON: id=${data.id}, name=${data.name}`);
+    
     const sheet = new Sheet(data.name, data.id);
     
-    if (data.cells) {
+    // Set cells from data
+    if (data.cells && Object.keys(data.cells).length > 0) {
+      console.log(`[Sheet] Setting ${Object.keys(data.cells).length} cells from JSON data`);
+      
       Object.entries(data.cells).forEach(([id, cellData]) => {
         sheet.setCell(id, cellData);
       });
+    } else if (data.cellIds && data.cellIds.length > 0) {
+      // If we have cellIds but no cells, log this for debugging
+      console.log(`[Sheet] Sheet has ${data.cellIds.length} cell IDs but no cell data`);
     }
     
+    // Set workbook ID if available
     if (data.workbookId) {
       sheet.setWorkbookId(parseInt(data.workbookId.toString(), 10));
     }

@@ -21,8 +21,9 @@ export interface CellStyle {
 export interface SheetData {
   id: number;
   name: string;
-  workbookId: string | null;
+  workbookId?: string | null;
   cells: Record<string, CellData>;
+  cellIds?: string[];
 }
 
 export interface WorkbookData {

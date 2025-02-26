@@ -145,9 +145,9 @@ export async function setWorkbookName(name: string) {
 /**
  * Get workbook state as JSON
  */
-export async function getWorkbookState() {
+export async function getWorkbookState(includeFullCellData: boolean = false) {
   const workbook = await getWorkbook();
-  return workbook.toJSON();
+  return workbook.toJSON(includeFullCellData);
 }
 
 /**
@@ -172,13 +172,19 @@ export async function restoreWorkbookState(data: any) {
  */
 export async function loadWorkbookFromCache(): Promise<boolean> {
   try {
-    const cachedWorkbook = await getWorkbookFromCache();
+    const workbook = await getWorkbook();
+    const workbookId = workbook.getId().toString();
+    
+    console.log(`[WorkbookController] Attempting to load workbook ${workbookId} from cache`);
+    const cachedWorkbook = await getWorkbookFromCache(workbookId);
+    
     if (cachedWorkbook) {
-      const workbook = await getWorkbook();
       workbook.fromJSON(cachedWorkbook);
       console.log('[WorkbookController] Workbook loaded from cache');
       return true;
     }
+    
+    console.log('[WorkbookController] No cached workbook found');
     return false;
   } catch (error) {
     console.error('[WorkbookController] Failed to load workbook from cache:', error);

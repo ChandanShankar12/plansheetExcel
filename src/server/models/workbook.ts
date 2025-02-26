@@ -1,11 +1,19 @@
 import { Sheet } from './sheet';
 
+// Define the WorkbookConfig interface
+export interface WorkbookConfig {
+  theme: string;
+  autoSave: boolean;
+  [key: string]: any; // Allow for additional config properties
+}
+
 export class Workbook {
   private _name: string;
   private _sheets: Map<number, Sheet>;
   private _nextSheetId: number;
   private _initialized: boolean = false;
   private _id: number;
+  private _config: WorkbookConfig;
 
   constructor(name: string = 'Untitled') {
     console.log('[Workbook] New workbook created with name:', name);
@@ -13,6 +21,11 @@ export class Workbook {
     this._sheets = new Map<number, Sheet>();
     this._nextSheetId = 1;
     this._id = Date.now(); // Assign a unique ID to the workbook
+    // Initialize with default config
+    this._config = {
+      theme: 'light',
+      autoSave: false
+    };
   }
 
   public getId(): number {
@@ -25,6 +38,14 @@ export class Workbook {
 
   public setName(name: string): void {
     this._name = name;
+  }
+
+  public getConfig(): WorkbookConfig {
+    return this._config;
+  }
+
+  public setConfig(config: Partial<WorkbookConfig>): void {
+    this._config = { ...this._config, ...config };
   }
 
   public isInitialized(): boolean {
@@ -89,13 +110,27 @@ export class Workbook {
     this._sheets.delete(id);
   }
 
-  public toJSON() {
+  public toJSON(includeFullCellData: boolean = false) {
+    console.log(`[Workbook] Converting to JSON with includeFullCellData=${includeFullCellData}`);
+    
+    // Get all sheets with their data
+    const sheetsData = this.getSheets().map(sheet => {
+      // Get sheet data with or without full cell data based on parameter
+      const sheetData = sheet.toJSON(includeFullCellData);
+      
+      // Log the sheet data for debugging
+      console.log(`[Workbook] Sheet ${sheetData.id} has ${sheetData.cellIds?.length || 0} cell IDs`);
+      
+      return sheetData;
+    });
+    
     return {
       id: this._id,
       name: this._name,
       nextSheetId: this._nextSheetId,
-      sheets: this.getSheets().map(sheet => sheet.toJSON()),
-      initialized: this._initialized
+      sheets: sheetsData,
+      initialized: this._initialized,
+      config: this._config
     };
   }
 
@@ -118,17 +153,34 @@ export class Workbook {
       this._initialized = data.initialized;
     }
     
+    if (data.config) {
+      this._config = { ...this._config, ...data.config };
+    }
+    
     // Clear existing sheets
     this._sheets.clear();
     
     // Restore sheets from data
-    if (data.sheets) {
+    if (data.sheets && Array.isArray(data.sheets)) {
+      console.log(`[Workbook] Restoring ${data.sheets.length} sheets`);
+      
       data.sheets.forEach((sheetData: any) => {
-        const sheet = Sheet.fromJSON(sheetData);
-        // Ensure the sheet has the correct workbook ID
-        sheet.setWorkbookId(this._id);
-        this._sheets.set(sheet.getId(), sheet);
+        try {
+          // Log the sheet data for debugging
+          console.log(`[Workbook] Restoring sheet ${sheetData.id} with ${sheetData.cellIds?.length || 0} cell IDs`);
+          
+          const sheet = Sheet.fromJSON(sheetData);
+          
+          // Ensure the sheet has the correct workbook ID
+          sheet.setWorkbookId(this._id);
+          
+          this._sheets.set(sheet.getId(), sheet);
+        } catch (error) {
+          console.error(`[Workbook] Failed to restore sheet from JSON:`, error);
+        }
       });
+    } else {
+      console.warn('[Workbook] No sheets found in JSON data');
     }
   }
 }
