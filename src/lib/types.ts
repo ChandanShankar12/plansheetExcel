@@ -1,12 +1,9 @@
-import { Cell } from '@/server/models/cell';
-import { Sheet } from '@/server/models/sheets';
-
 export interface CellData {
-  value?: any;
-  formula?: string;
-  style?: CellStyle;
-  lastModified?: string;
-  isModified?: boolean;
+  value: any;
+  formula: string;
+  style: CellStyle;
+  isModified: boolean;
+  lastModified: string;
   metadata?: Record<string, any>;
 }
 
@@ -24,13 +21,14 @@ export interface CellStyle {
 export interface SheetData {
   id: number;
   name: string;
+  workbookId: string | null;
   cells: Record<string, CellData>;
 }
 
 export interface WorkbookData {
   id: string;
-  sheets: SheetData[];
   activeSheetId: number;
+  sheets: SheetData[];
 }
 
 export type Selection = {

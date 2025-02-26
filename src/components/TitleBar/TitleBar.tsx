@@ -8,11 +8,15 @@ import { AioutlineSearch } from './AioutlineSearch';
 import { ToggleSwitch } from '../ui/toggle-switch';
 import { SaveButton } from '../ui/SaveButton';
 import { Divider } from '../ui/divider';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useSpreadsheet } from '@/context/spreadsheet-context';
 
 export const TitleBar = memo(function TitleBar() {
-  const { activeSheet } = useSpreadsheet();
+  const { activeSheet, setAutoSaveEnabled, autoSaveEnabled } = useSpreadsheet();
+  
+  const handleAutoSaveToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAutoSaveEnabled(e.target.checked);
+  };
   
   return (
     <div className="flex flex-row w-full items-center bg-[#E3E3E3] h-[35px] px-2">
@@ -21,7 +25,7 @@ export const TitleBar = memo(function TitleBar() {
         <SaveButton />
         <Divider />
         <span className="text-[12px] flex flex-row items-center gap-2">
-          <ToggleSwitch /> AutoSave
+          <ToggleSwitch checked={autoSaveEnabled} onChange={handleAutoSaveToggle} /> AutoSave
         </span>
       </div>
 

@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Sheet } from '@/server/models/sheet';
-import { Cell } from '@/server/models/cell';
 import { Selection, CellData } from '@/lib/types';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +13,8 @@ interface SpreadsheetContextType {
   activeCell: string | null;
   selection: Selection | null;
   isTransitioning: boolean;
+  autoSaveEnabled: boolean;
+  setAutoSaveEnabled: (enabled: boolean) => void;
   setActiveSheet: (sheet: Sheet | null) => void;
   setActiveCell: (cellId: string | null) => void;
   setSelection: (selection: Selection | null) => void;
@@ -31,16 +32,21 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(false);
   const { toast } = useToast();
 
   // Load sheets from API or create default
   useEffect(() => {
+    let isMounted = true;
     setIsLoading(true);
+    
     (async () => {
       try {
         // Try to fetch sheets from API
         const resp = await fetch('/api/init');
         const data = await resp.json();
+
+        if (!isMounted) return;
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to initialize application');
@@ -54,11 +60,16 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
         if (loadedSheets.length > 0) {
           setSheets(loadedSheets);
           setActiveSheet(loadedSheets[0]);
+          
+          // Log successful initialization
+          console.log('[SpreadsheetContext] Loaded sheets from server:', loadedSheets.length);
         } else {
           // Create default sheet if none returned
           throw new Error('No sheets returned from server');
         }
       } catch (error) {
+        if (!isMounted) return;
+        
         console.error('[SpreadsheetContext] Failed to load sheets:', error);
         
         // Create a default sheet if loading fails
@@ -72,27 +83,25 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
           variant: 'default',
         });
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     })();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [toast]);
 
   // Debounced save function for cell updates
   const debouncedSave = useDebounce(async (sheetId: number, cellId: string, data: CellData) => {
     try {
-      const response = await fetch(`/api/sheets/${sheetId}/cells/${cellId}`, {
+      await fetch(`/api/sheets/${sheetId}/cells/${cellId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save cell');
-      }
-      
-      console.log(`[SpreadsheetContext] Cell ${cellId} saved successfully`);
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to save cell:', error);
       toast({
@@ -126,8 +135,6 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       
       setSheets(prev => [...prev, newSheet]);
       setActiveSheet(newSheet);
-      
-      console.log(`[SpreadsheetContext] Sheet "${sheetName}" created successfully with ID ${newSheet.getId()}`);
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to add sheet:', error);
       
@@ -153,33 +160,6 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     }
   }, [sheets]);
 
-  // Save workbook state
-  const saveWorkbook = useCallback(async () => {
-    try {
-      const response = await fetch('/api/workbook/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save workbook');
-      }
-      
-      console.log('[SpreadsheetContext] Workbook saved successfully');
-      return true;
-    } catch (error) {
-      console.error('[SpreadsheetContext] Failed to save workbook:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save workbook state',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  }, [toast]);
-
   // Update a cell
   const updateCell = useCallback(async (cellId: string, data: Partial<CellData>) => {
     if (!activeSheet) return;
@@ -203,15 +183,25 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       };
       
       // Update cell in the active sheet
-      const cell = activeSheet.getCell(cellId) || new Cell(activeSheet.getId(), 1, 'A');
-      cell.updateProperties(updatedCellData);
-      activeSheet.setCell(cellId, cell);
+      activeSheet.setCell(cellId, updatedCellData);
       
       // Force re-render by creating a new array
       setSheets(prev => [...prev]);
       
-      // Save to server in the background
-      debouncedSave(activeSheet.getId(), cellId, updatedCellData);
+      // Always update the cell in the cache via API call
+      try {
+        await fetch(`/api/sheets/${activeSheet.getId()}/cells/${cellId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedCellData)
+        });
+        console.log(`[SpreadsheetContext] Cell ${cellId} updated and cached`);
+      } catch (error) {
+        console.error('[SpreadsheetContext] Failed to update cell in cache:', error);
+      }
+      
+      // If autoSave is enabled, we don't need to do anything else as the cell is already saved
+      // The debouncedSave is no longer needed as we're always saving immediately
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to update cell:', error);
       toast({
@@ -220,7 +210,45 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
         variant: 'destructive',
       });
     }
-  }, [activeSheet, debouncedSave, toast]);
+  }, [activeSheet, toast]);
+
+  // Save workbook to server and cache
+  const saveWorkbook = useCallback(async (): Promise<boolean> => {
+    try {
+      if (isLoading) {
+        console.log('[SpreadsheetContext] Cannot save workbook while loading');
+        return false;
+      }
+      
+      if (sheets.length === 0) {
+        console.warn('[SpreadsheetContext] No sheets to save');
+        return false;
+      }
+
+      // Call the API to save the workbook
+      const response = await fetch('/api/workbook/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to save workbook');
+      }
+      
+      console.log('[SpreadsheetContext] Workbook saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[SpreadsheetContext] Failed to save workbook:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save workbook',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [sheets, toast, isLoading]);
 
   return (
     <SpreadsheetContext.Provider
@@ -230,6 +258,8 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
         activeCell,
         selection,
         isTransitioning: isLoading,
+        autoSaveEnabled,
+        setAutoSaveEnabled,
         setActiveSheet,
         setActiveCell,
         setSelection,

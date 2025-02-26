@@ -5,12 +5,18 @@ export class Workbook {
   private _sheets: Map<number, Sheet>;
   private _nextSheetId: number;
   private _initialized: boolean = false;
+  private _id: number;
 
   constructor(name: string = 'Untitled') {
     console.log('[Workbook] New workbook created with name:', name);
     this._name = name;
     this._sheets = new Map<number, Sheet>();
     this._nextSheetId = 1;
+    this._id = Date.now(); // Assign a unique ID to the workbook
+  }
+
+  public getId(): number {
+    return this._id;
   }
 
   public getName(): string {
@@ -41,7 +47,7 @@ export class Workbook {
       // Ensure the first sheet has ID 1
       if (!this._sheets.has(1)) {
         console.log('[Workbook] Ensuring sheet with ID 1 exists');
-        const sheet = new Sheet('Sheet 1', 1);
+        const sheet = new Sheet('Sheet 1', 1, this._id);
         this._sheets.set(1, sheet);
         this._nextSheetId = Math.max(this._nextSheetId, 2);
       }
@@ -55,7 +61,7 @@ export class Workbook {
     const sheetName = name || `Sheet ${this._nextSheetId}`;
     console.log('[Workbook] Adding sheet:', { name: sheetName, id: this._nextSheetId });
     
-    const sheet = new Sheet(sheetName, this._nextSheetId);
+    const sheet = new Sheet(sheetName, this._nextSheetId, this._id);
     this._sheets.set(this._nextSheetId, sheet);
     
     // Increment sheet ID for next sheet
@@ -85,6 +91,7 @@ export class Workbook {
 
   public toJSON() {
     return {
+      id: this._id,
       name: this._name,
       nextSheetId: this._nextSheetId,
       sheets: this.getSheets().map(sheet => sheet.toJSON()),
@@ -94,6 +101,10 @@ export class Workbook {
 
   public fromJSON(data: any): void {
     console.log('[Workbook] Restoring from JSON');
+    
+    if (data.id) {
+      this._id = data.id;
+    }
     
     if (data.name) {
       this._name = data.name;
@@ -114,6 +125,8 @@ export class Workbook {
     if (data.sheets) {
       data.sheets.forEach((sheetData: any) => {
         const sheet = Sheet.fromJSON(sheetData);
+        // Ensure the sheet has the correct workbook ID
+        sheet.setWorkbookId(this._id);
         this._sheets.set(sheet.getId(), sheet);
       });
     }

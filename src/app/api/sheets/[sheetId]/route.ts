@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetById, deleteSheet, updateSheet } from '@/server/controllers/sheet.controller';
+import { initializeApplication } from '@/server/controllers/application.controller';
 
 export async function GET(
   request: Request,
@@ -7,6 +8,9 @@ export async function GET(
 ) {
   console.log('[API/Sheets] GET request:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     if (isNaN(sheetId)) {
       return NextResponse.json({ 
@@ -42,6 +46,9 @@ export async function DELETE(
 ) {
   console.log('[API/Sheets] DELETE request:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     if (isNaN(sheetId)) {
       return NextResponse.json({ 
@@ -71,6 +78,9 @@ export async function PATCH(
 ) {
   console.log('[API/Sheets] PATCH request:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     if (isNaN(sheetId)) {
       return NextResponse.json({ 
@@ -89,7 +99,7 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    const result = updateSheet(sheetId, data);
+    const result = await updateSheet(sheetId, data);
     if (!result.success) {
       return NextResponse.json({ 
         success: false, 

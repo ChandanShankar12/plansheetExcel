@@ -36,7 +36,16 @@ export async function POST(req: NextRequest) {
     console.log('[API/Sheets] Creating sheet with name:', name);
     const sheet = await createSheet(name);
     
+    // Save the workbook to ensure the new sheet is properly cached
+    const { cacheWorkbook } = await import('@/server/services/cache.service');
+    const { getWorkbookState } = await import('@/server/controllers/workbook.controller');
+    
+    const workbookData = await getWorkbookState();
+    await cacheWorkbook(workbookData);
+    
     console.log('[API/Sheets] Sheet created successfully:', sheet.getId());
+    console.log('[API/Sheets] Workbook updated with new sheet, sheets count:', workbookData.sheets.length);
+    
     return NextResponse.json({
       success: true,
       data: sheet.toJSON()
@@ -57,7 +66,7 @@ export async function GET() {
     // Initialize application first
     await initializeApplication();
     
-    const sheets = getAllSheets();
+    const sheets = await getAllSheets();
     return NextResponse.json({
       success: true,
       data: sheets.map(sheet => sheet.toJSON())

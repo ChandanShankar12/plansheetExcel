@@ -1,0 +1,9 @@
+---
+description: This application is servers the platform where user can store, relate, analyse data and suggest based in a table UI format. It contains react components that are layed on the page to form the UI and the backend with cache database/primary database. 
+globs: 
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to

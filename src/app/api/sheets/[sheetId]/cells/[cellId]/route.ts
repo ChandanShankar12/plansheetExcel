@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCell, updateCell, deleteCell } from '@/server/controllers/cell.controller';
-import { getSheetById } from '@/server/controllers/sheet.controller';
+import { updateCell, getCell, deleteCell } from '@/server/controllers/cell.controller';
+import { initializeApplication } from '@/server/controllers/application.controller';
 
 // GET: Get a specific cell's value
 export async function GET(
@@ -9,17 +9,11 @@ export async function GET(
 ) {
   console.log('[API/Cells] GET request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     const cellId = params.cellId;
-    
-    // First check if the sheet exists
-    const sheet = await getSheetById(sheetId);
-    if (!sheet) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
-    }
     
     const cell = await getCell(sheetId, cellId);
     
@@ -50,9 +44,11 @@ export async function POST(
 ) {
   console.log('[API/Cells] POST request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const updates = await req.json();
     const sheetId = parseInt(params.sheetId);
-    const cellId = params.cellId;
     
     if (isNaN(sheetId)) {
       return NextResponse.json({ 
@@ -61,17 +57,15 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // First check if the sheet exists
-    const sheet = await getSheetById(sheetId);
-    if (!sheet) {
+    // Update the cell using the controller
+    const updatedCell = await updateCell(sheetId, params.cellId, updates);
+    
+    if (!updatedCell) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
+        error: 'Failed to update cell' 
+      }, { status: 500 });
     }
-
-    // Update the cell using our controller
-    const updatedCell = updateCell(sheetId, cellId, updates);
 
     return NextResponse.json({
       success: true,
@@ -93,23 +87,16 @@ export async function DELETE(
 ) {
   console.log('[API/Cells] DELETE request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     const cellId = params.cellId;
     
-    // First check if the sheet exists
-    const sheet = await getSheetById(sheetId);
-    if (!sheet) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
-    }
-    
-    const result = deleteCell(sheetId, cellId);
+    const result = await deleteCell(sheetId, cellId);
     
     return NextResponse.json({ 
-      success: true,
-      data: result
+      success: result.success 
     });
   } catch (error) {
     console.error('[API/Cells] DELETE failed:', error);
@@ -120,27 +107,28 @@ export async function DELETE(
   }
 }
 
-// PATCH: Update a cell's value
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { sheetId: string; cellId: string } }
 ) {
   console.log('[API/Cells] PATCH request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     const cellId = params.cellId;
     const updates = await req.json();
     
-    // First check if the sheet exists
-    const sheet = await getSheetById(sheetId);
-    if (!sheet) {
+    // Update the cell
+    const updatedCell = await updateCell(sheetId, cellId, updates);
+    
+    if (!updatedCell) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Sheet not found' 
-      }, { status: 404 });
+        error: 'Failed to update cell' 
+      }, { status: 500 });
     }
-    
-    const updatedCell = updateCell(sheetId, cellId, updates);
     
     return NextResponse.json({ 
       success: true, 

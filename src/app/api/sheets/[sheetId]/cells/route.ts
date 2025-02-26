@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetById } from '@/server/controllers/sheet.controller';
 import { getAllCells, updateMultipleCells } from '@/server/controllers/cell.controller';
+import { getSheetCellsFromCache } from '@/server/controllers/sheet.controller';
+import { initializeApplication } from '@/server/controllers/application.controller';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { sheetId: string } }
 ) {
+  console.log('[API/Cells] GET all cells request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const sheetId = parseInt(params.sheetId);
     
     if (isNaN(sheetId)) {
@@ -26,21 +32,29 @@ export async function GET(
         }, { status: 404 });
       }
       
-      const cells = getAllCells(sheetId);
+      // Try to get cells from cache first
+      let cells;
+      try {
+        cells = await getSheetCellsFromCache(sheetId);
+        console.log(`[API/Cells] Retrieved ${Object.keys(cells).length} cells from cache for sheet ${sheetId}`);
+      } catch (error) {
+        console.warn(`[API/Cells] Failed to get cells from cache, falling back to sheet:`, error);
+        cells = await getAllCells(sheetId);
+      }
       
       return NextResponse.json({
         success: true,
         data: cells
       });
     } catch (error) {
-      console.error('Error getting cells:', error);
+      console.error('[API/Cells] Error getting cells:', error);
       return NextResponse.json({
         success: false,
         error: 'Sheet not found'
       }, { status: 404 });
     }
   } catch (error) {
-    console.error('Failed to get cells:', error);
+    console.error('[API/Cells] Failed to get cells:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to get cells'
@@ -52,7 +66,11 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { sheetId: string } }
 ) {
+  console.log('[API/Cells] POST bulk update request received:', params);
   try {
+    // Initialize the application
+    await initializeApplication();
+    
     const updates = await req.json();
     const sheetId = parseInt(params.sheetId);
     
@@ -80,21 +98,21 @@ export async function POST(
       }
       
       // Update multiple cells at once
-      const result = updateMultipleCells(sheetId, cellUpdates);
+      const result = await updateMultipleCells(sheetId, cellUpdates);
       
       return NextResponse.json({
         success: true,
         data: result
       });
     } catch (error) {
-      console.error('Error updating cells:', error);
+      console.error('[API/Cells] Error updating cells:', error);
       return NextResponse.json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update cells'
       }, { status: 404 });
     }
   } catch (error) {
-    console.error('Failed to update cells:', error);
+    console.error('[API/Cells] Failed to update cells:', error);
     return NextResponse.json({
       success: false,
       error: 'Failed to update cells'

@@ -8,7 +8,7 @@ import { Button } from './button';
 import { useToast } from '@/hooks/use-toast';
 
 export const SaveButton = () => {
-  const { sheets, activeSheet } = useSpreadsheet();
+  const { sheets, activeSheet, saveWorkbook } = useSpreadsheet();
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
@@ -18,20 +18,16 @@ export const SaveButton = () => {
     try {
       setIsSaving(true);
       
-      const response = await fetch('/api/workbook/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sheets: sheets.map(s => s.toJSON())
-        })
-      });
+      const success = await saveWorkbook();
 
-      if (!response.ok) throw new Error('Failed to save workbook');
-
-      toast({
-        title: 'Success',
-        description: 'Workbook saved successfully',
-      });
+      if (success) {
+        toast({
+          title: 'Success',
+          description: 'Workbook saved successfully',
+        });
+      } else {
+        throw new Error('Failed to save workbook');
+      }
     } catch (error) {
       console.error('Failed to save:', error);
       toast({

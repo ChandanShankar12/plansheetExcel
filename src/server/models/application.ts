@@ -1,12 +1,28 @@
 import { Workbook } from './workbook';
 
+// Global type for Next.js
+declare global {
+  var __app_instance: Application | undefined;
+}
+
 export class Application {
   private _workbook: Workbook;
   private _version: string;
   private readonly _companyId: string;
   private _initialized: boolean = false;
 
-  constructor(companyId: string = 'Coho.', version: string = '1.0.0') {
+  // Static method to get the singleton instance
+  public static getInstance(companyId: string = 'Coho.', version: string = '1.0.0'): Application {
+    // Use global object to store the instance (works across API routes in Next.js)
+    if (!global.__app_instance) {
+      console.log('[Application] Creating singleton instance');
+      global.__app_instance = new Application(companyId, version);
+    }
+    return global.__app_instance;
+  }
+
+  // Private constructor to prevent direct instantiation
+  private constructor(companyId: string = 'Coho.', version: string = '1.0.0') {
     console.log('[Application] Constructor called');
     this._companyId = companyId;
     this._version = version;

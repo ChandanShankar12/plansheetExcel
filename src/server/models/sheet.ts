@@ -1,19 +1,19 @@
-import { SheetData } from '@/lib/types';
-import { Cell, CellData, CellStyle } from './cell';
+import { CellData, SheetData } from '@/lib/types';
 
 export class Sheet {
   private _id: number;
   private _name: string;
-  private _cells: Map<string, Cell>;
+  private _cells: Map<string, CellData>;
   private _isModified: boolean;
   private _lastModified: string;
-
-  constructor(name: string, id?: number) {
-    this._id = id || 0;
+  private _workbookId: number | null;
+  constructor(name: string, id?: number, workbookId?: number) {
+    this._id = id || Date.now();
     this._name = name;
-    this._cells = new Map<string, Cell>();
+    this._cells = new Map<string, CellData>();
     this._isModified = false;
     this._lastModified = new Date().toISOString();
+    this._workbookId = workbookId || null;
   }
 
   // Get sheet ID
@@ -34,18 +34,18 @@ export class Sheet {
   }
 
   // Get all cells
-  getCells(): Map<string, Cell> {
+  getCells(): Map<string, CellData> {
     return this._cells;
   }
 
   // Get a specific cell
-  getCell(id: string): Cell | null {
+  getCell(id: string): CellData | null {
     return this._cells.get(id) || null;
   }
 
   // Set a cell
-  setCell(id: string, cell: Cell): void {
-    this._cells.set(id, cell);
+  setCell(id: string, data: CellData): void {
+    this._cells.set(id, data);
     this._isModified = true;
     this._lastModified = new Date().toISOString();
   }
@@ -54,22 +54,22 @@ export class Sheet {
   updateCell(id: string, updates: Partial<CellData>): void {
     const currentCell = this._cells.get(id);
     if (currentCell) {
-      // Update existing cell using its updateProperties method
-      currentCell.updateProperties(updates);
+      this._cells.set(id, {
+        ...currentCell,
+        ...updates,
+        isModified: true,
+        lastModified: new Date().toISOString()
+      });
     } else {
       // Create a new cell if it doesn't exist
-      // Parse the cell ID to extract row and column (assuming format like "A1", "B2", etc.)
-      const column = id.match(/[A-Z]+/)?.[0] || 'A';
-      const row = parseInt(id.match(/\d+/)?.[0] || '1', 10);
-      
-      const newCell = new Cell(this._id, row, column);
-      if (updates.value !== undefined) newCell.setValue(updates.value);
-      if (updates.formula !== undefined) newCell.setFormula(updates.formula);
-      if (updates.style !== undefined) newCell.style = { ...newCell.style, ...updates.style };
-      
-      this._cells.set(id, newCell);
+      this._cells.set(id, {
+        value: updates.value || '',
+        formula: updates.formula || '',
+        style: updates.style || {},
+        isModified: true,
+        lastModified: new Date().toISOString()
+      });
     }
-    
     this._isModified = true;
     this._lastModified = new Date().toISOString();
   }
@@ -96,11 +96,19 @@ export class Sheet {
 
   // Get cells as an object for API responses
   getCellsData(): Record<string, CellData> {
-    const cellsData: Record<string, CellData> = {};
-    this._cells.forEach((cell, id) => {
-      cellsData[id] = cell.toCellData();
-    });
-    return cellsData;
+    return Object.fromEntries(this._cells);
+  }
+
+  // Get workbook ID
+  getWorkbookId(): number | null {
+    return this._workbookId;
+  }
+
+  // Set workbook ID
+  setWorkbookId(workbookId: number): void {
+    this._workbookId = workbookId;
+    this._isModified = true;
+    this._lastModified = new Date().toISOString();
   }
 
   // Convert to JSON
@@ -108,7 +116,8 @@ export class Sheet {
     return {
       id: this._id,
       name: this._name,
-      cells: this.getCellsData(),
+      cells: Object.fromEntries(this._cells),
+      workbookId: this._workbookId?.toString() || null,
     };
   }
 
@@ -118,14 +127,12 @@ export class Sheet {
     
     if (data.cells) {
       Object.entries(data.cells).forEach(([id, cellData]) => {
-        // Parse the cell ID to extract row and column
-        const column = id.match(/[A-Z]+/)?.[0] || 'A';
-        const row = parseInt(id.match(/\d+/)?.[0] || '1', 10);
-        
-        const cell = new Cell(sheet.getId(), row, column);
-        cell.updateProperties(cellData);
-        sheet.setCell(id, cell);
+        sheet.setCell(id, cellData);
       });
+    }
+    
+    if (data.workbookId) {
+      sheet.setWorkbookId(parseInt(data.workbookId.toString(), 10));
     }
     
     return sheet;

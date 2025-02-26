@@ -136,7 +136,8 @@ export const Sheet = memo(function Sheet() {
     isTransitioning,
     setActiveCell,
     setSelection,
-    saveWorkbook
+    saveWorkbook,
+    autoSaveEnabled
   } = useSpreadsheet();
   const [isSelecting, setIsSelecting] = useState(false);
   const { toast } = useToast();
@@ -152,16 +153,24 @@ export const Sheet = memo(function Sheet() {
 
   // Auto-save workbook periodically
   useEffect(() => {
+    // Don't set up auto-save if we're still loading, don't have an active sheet, or autosave is disabled
+    if (isTransitioning || !activeSheet || !autoSaveEnabled) return;
+    
+    console.log('[Sheet] Setting up auto-save interval');
     const saveInterval = setInterval(() => {
       if (activeSheet) {
+        console.log('[Sheet] Auto-saving workbook...');
         saveWorkbook().catch(error => {
           console.error('[Sheet] Auto-save failed:', error);
         });
       }
     }, 60000); // Save every minute
     
-    return () => clearInterval(saveInterval);
-  }, [activeSheet, saveWorkbook]);
+    return () => {
+      console.log('[Sheet] Clearing auto-save interval');
+      clearInterval(saveInterval);
+    };
+  }, [activeSheet, saveWorkbook, isTransitioning, autoSaveEnabled]);
 
   useEffect(() => {
     document.addEventListener('mouseup', handleMouseUp);
