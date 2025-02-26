@@ -17,6 +17,15 @@ export async function GET(
     }
     
     try {
+      // First check if the sheet exists
+      const sheet = await getSheetById(sheetId);
+      if (!sheet) {
+        return NextResponse.json({
+          success: false,
+          error: 'Sheet not found'
+        }, { status: 404 });
+      }
+      
       const cells = getAllCells(sheetId);
       
       return NextResponse.json({
@@ -24,6 +33,7 @@ export async function GET(
         data: cells
       });
     } catch (error) {
+      console.error('Error getting cells:', error);
       return NextResponse.json({
         success: false,
         error: 'Sheet not found'
@@ -55,7 +65,13 @@ export async function POST(
     
     try {
       // Check if sheet exists
-      getSheetById(sheetId);
+      const sheet = await getSheetById(sheetId);
+      if (!sheet) {
+        return NextResponse.json({
+          success: false,
+          error: 'Sheet not found'
+        }, { status: 404 });
+      }
       
       // Format updates into the expected structure
       const cellUpdates: Record<string, any> = {};
@@ -71,9 +87,10 @@ export async function POST(
         data: result
       });
     } catch (error) {
+      console.error('Error updating cells:', error);
       return NextResponse.json({
         success: false,
-        error: 'Sheet not found'
+        error: error instanceof Error ? error.message : 'Failed to update cells'
       }, { status: 404 });
     }
   } catch (error) {

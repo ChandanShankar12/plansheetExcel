@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SheetController } from '@/server/controllers/sheet.controller';
-import { ApplicationController } from '@/server/controllers/application.controller';
+import { createSheet, getAllSheets } from '@/server/controllers/sheet.controller';
+import { initializeApplication } from '@/server/controllers/application.controller';
 
 // Interface for cell updates
 interface CellData {
@@ -28,17 +28,13 @@ export async function POST(req: NextRequest) {
   console.log('[API/Sheets] POST request received');
   try {
     // Initialize application first
-    const appController = ApplicationController.getInstance();
-    await appController.initialize();
-    
-    // Now get the sheet controller
-    const sheetController = SheetController.getInstance();
+    await initializeApplication();
     
     const body = await req.json();
     const name = body.name || `Sheet ${Date.now()}`;
     
     console.log('[API/Sheets] Creating sheet with name:', name);
-    const sheet = await sheetController.createSheet(name);
+    const sheet = await createSheet(name);
     
     console.log('[API/Sheets] Sheet created successfully:', sheet.getId());
     return NextResponse.json({
@@ -59,13 +55,9 @@ export async function GET() {
   console.log('[API/Sheets] GET request received');
   try {
     // Initialize application first
-    const appController = ApplicationController.getInstance();
-    await appController.initialize();
+    await initializeApplication();
     
-    // Now get the sheet controller
-    const sheetController = SheetController.getInstance();
-    
-    const sheets = await sheetController.getAllSheets();
+    const sheets = getAllSheets();
     return NextResponse.json({
       success: true,
       data: sheets.map(sheet => sheet.toJSON())

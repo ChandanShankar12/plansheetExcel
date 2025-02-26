@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SheetController } from '@/server/controllers/sheet.controller';
-
-const sheetController = SheetController.getInstance();
+import { getSheetById, deleteSheet, updateSheet } from '@/server/controllers/sheet.controller';
 
 export async function GET(
   request: Request,
@@ -17,7 +15,7 @@ export async function GET(
       }, { status: 400 });
     }
 
-    const sheet = await sheetController.getSheet(sheetId);
+    const sheet = await getSheetById(sheetId);
     if (!sheet) {
       return NextResponse.json({ 
         success: false, 
@@ -52,7 +50,7 @@ export async function DELETE(
       }, { status: 400 });
     }
 
-    await sheetController.deleteSheet(sheetId);
+    await deleteSheet(sheetId);
 
     return NextResponse.json({
       success: true,
@@ -91,8 +89,8 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    const sheet = await sheetController.updateSheet(sheetId, data);
-    if (!sheet) {
+    const result = updateSheet(sheetId, data);
+    if (!result.success) {
       return NextResponse.json({ 
         success: false, 
         error: 'Sheet not found' 
@@ -101,7 +99,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      data: sheet.toJSON()
+      data: result.sheet
     });
   } catch (error) {
     console.error('[API/Sheets] PATCH failed:', error);

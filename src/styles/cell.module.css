@@ -17,6 +17,10 @@
   outline: 1px solid #1a73e8;
 }
 
+.updating {
+  background-color: #f0f8ff;
+}
+
 .cellInput {
   position: absolute;
   inset: 0;

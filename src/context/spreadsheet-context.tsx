@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Sheet } from '@/server/models/sheet';
+import { Cell } from '@/server/models/cell';
 import { Selection, CellData } from '@/lib/types';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ interface SpreadsheetContextType {
   addSheet: (name?: string) => Promise<void>;
   updateCell: (cellId: string, data: Partial<CellData>) => Promise<void>;
   switchSheet: (sheet: Sheet) => void;
+  saveWorkbook: () => Promise<boolean>;
 }
 
 const SpreadsheetContext = createContext<SpreadsheetContextType | undefined>(undefined);
@@ -37,7 +39,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
     (async () => {
       try {
         // Try to fetch sheets from API
-        const resp = await fetch('/api/init');
+        const resp = await fetch('/api/__init__');
         const data = await resp.json();
 
         if (!data.success) {
@@ -67,7 +69,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
         toast({
           title: 'Using default sheet',
           description: 'Could not load sheets from server',
-          variant: 'warning',
+          variant: 'default',
         });
       } finally {
         setIsLoading(false);
@@ -78,11 +80,19 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
   // Debounced save function for cell updates
   const debouncedSave = useDebounce(async (sheetId: number, cellId: string, data: CellData) => {
     try {
-      await fetch(`/api/sheets/${sheetId}/cells/${cellId}`, {
+      const response = await fetch(`/api/sheets/${sheetId}/cells/${cellId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save cell');
+      }
+      
+      console.log(`[SpreadsheetContext] Cell ${cellId} saved successfully`);
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to save cell:', error);
       toast({
@@ -116,6 +126,8 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       
       setSheets(prev => [...prev, newSheet]);
       setActiveSheet(newSheet);
+      
+      console.log(`[SpreadsheetContext] Sheet "${sheetName}" created successfully with ID ${newSheet.getId()}`);
     } catch (error) {
       console.error('[SpreadsheetContext] Failed to add sheet:', error);
       
@@ -127,7 +139,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       toast({
         title: 'Warning',
         description: 'Sheet created locally only - changes may not persist',
-        variant: 'warning',
+        variant: 'default',
       });
     }
   }, [sheets, toast]);
@@ -140,6 +152,33 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       setSelection(null);
     }
   }, [sheets]);
+
+  // Save workbook state
+  const saveWorkbook = useCallback(async () => {
+    try {
+      const response = await fetch('/api/workbook/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save workbook');
+      }
+      
+      console.log('[SpreadsheetContext] Workbook saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[SpreadsheetContext] Failed to save workbook:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save workbook state',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [toast]);
 
   // Update a cell
   const updateCell = useCallback(async (cellId: string, data: Partial<CellData>) => {
@@ -164,7 +203,9 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
       };
       
       // Update cell in the active sheet
-      activeSheet.setCell(cellId, updatedCellData);
+      const cell = activeSheet.getCell(cellId) || new Cell(activeSheet.getId(), 1, 'A');
+      cell.updateProperties(updatedCellData);
+      activeSheet.setCell(cellId, cell);
       
       // Force re-render by creating a new array
       setSheets(prev => [...prev]);
@@ -195,6 +236,7 @@ export function SpreadsheetProvider({ children }: { children: React.ReactNode })
         addSheet,
         updateCell,
         switchSheet,
+        saveWorkbook,
       }}
     >
       {children}

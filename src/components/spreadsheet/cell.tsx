@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CellData } from '@/lib/types';
-import styles from '../../styles/cell.module.css';
+import styles from '@/styles/cell.module.css';
 import { useSpreadsheet } from '@/context/spreadsheet-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,7 @@ const Cell: React.FC<CellProps> = ({ id, data, isActive, onClick, onChange }) =>
   };
 
   const [editValue, setEditValue] = useState(cellData.value?.toString() || '');
+  const [isUpdating, setIsUpdating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { updateCell } = useSpreadsheet();
   const { toast } = useToast();
@@ -51,20 +52,29 @@ const Cell: React.FC<CellProps> = ({ id, data, isActive, onClick, onChange }) =>
   }, []);
 
   const handleBlur = useCallback(async () => {
-    // Only update if value has changed
+    // Only update if value has changed and not already updating
+    if (isUpdating) return;
+    
     if (editValue !== (cellData.value?.toString() || '')) {
       try {
+        setIsUpdating(true);
         await updateCell(id, { value: editValue });
         onChange(editValue);
+        console.log(`[Cell] Updated cell ${id} with value: ${editValue}`);
       } catch (error) {
+        console.error(`[Cell] Error updating cell ${id}:`, error);
         toast({
           title: 'Error updating cell',
           description: error instanceof Error ? error.message : 'An unknown error occurred',
           variant: 'destructive',
         });
+        // Revert to previous value on error
+        setEditValue(cellData.value?.toString() || '');
+      } finally {
+        setIsUpdating(false);
       }
     }
-  }, [id, editValue, cellData.value, updateCell, onChange, toast]);
+  }, [id, editValue, cellData.value, updateCell, onChange, toast, isUpdating]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -75,7 +85,7 @@ const Cell: React.FC<CellProps> = ({ id, data, isActive, onClick, onChange }) =>
 
   return (
     <div 
-      className={`${styles.cell} ${isActive ? styles.active : ''}`} 
+      className={`${styles.cell} ${isActive ? styles.active : ''} ${isUpdating ? styles.updating : ''}`} 
       onClick={onClick}
       data-cell-id={id}
     >
@@ -88,6 +98,7 @@ const Cell: React.FC<CellProps> = ({ id, data, isActive, onClick, onChange }) =>
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className={styles.cellInput}
+          disabled={isUpdating}
         />
       ) : (
         <div className={styles.cellContent}>

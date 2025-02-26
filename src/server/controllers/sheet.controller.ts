@@ -2,12 +2,41 @@ import { Sheet } from '../models/sheet';
 import { SheetData } from '@/lib/types';
 import { getSheet, getWorkbook } from './workbook.controller';
 import { CellData } from '../models/cell';
+import { 
+  cacheSheet, 
+  getSheetFromCache,
+  cacheCellData,
+  deleteCellFromCache
+} from '../services/cache.service';
 
 /**
- * Get a sheet by ID
+ * Get a sheet by ID, trying cache first
  */
-export function getSheetById(id: number): Sheet | undefined {
-  return getSheet(id);
+export async function getSheetById(id: number): Promise<Sheet | undefined> {
+  // Try to get from cache first
+  try {
+    const cachedSheet = await getSheetFromCache(id);
+    if (cachedSheet) {
+      console.log(`[SheetController] Sheet ${id} loaded from cache`);
+      return Sheet.fromJSON(cachedSheet);
+    }
+  } catch (error) {
+    console.warn(`[SheetController] Failed to get sheet ${id} from cache:`, error);
+  }
+  
+  // Fall back to getting from workbook
+  const sheet = getSheet(id);
+  
+  // Cache the sheet if found
+  if (sheet) {
+    try {
+      await cacheSheet(id, sheet.toJSON());
+    } catch (error) {
+      console.warn(`[SheetController] Failed to cache sheet ${id}:`, error);
+    }
+  }
+  
+  return sheet;
 }
 
 /**
@@ -15,19 +44,34 @@ export function getSheetById(id: number): Sheet | undefined {
  */
 export async function createSheet(name?: string) {
   const workbook = getWorkbook();
-  return await workbook.addSheet(name);
+  const sheet = await workbook.addSheet(name);
+  
+  // Cache the new sheet
+  try {
+    await cacheSheet(sheet.getId(), sheet.toJSON());
+  } catch (error) {
+    console.warn(`[SheetController] Failed to cache new sheet:`, error);
+  }
+  
+  return sheet;
 }
 
 /**
  * Update sheet name
  */
 export function updateSheetName(id: number, name: string) {
-  const sheet = getSheetById(id);
+  const sheet = getSheet(id);
   if (!sheet) {
     throw new Error(`Sheet with ID ${id} not found`);
   }
   
   sheet.setName(name);
+  
+  // Cache the updated sheet
+  cacheSheet(id, sheet.toJSON()).catch(error => {
+    console.warn(`[SheetController] Failed to cache sheet ${id} after rename:`, error);
+  });
+  
   return { success: true, sheet: sheet.toJSON() };
 }
 
@@ -44,7 +88,7 @@ export async function deleteSheet(id: number) {
  * Get all cells in a sheet
  */
 export function getSheetCells(id: number) {
-  const sheet = getSheetById(id);
+  const sheet = getSheet(id);
   if (!sheet) {
     throw new Error(`Sheet with ID ${id} not found`);
   }
@@ -56,7 +100,7 @@ export function getSheetCells(id: number) {
  * Get a specific cell in a sheet
  */
 export function getSheetCell(sheetId: number, cellId: string) {
-  const sheet = getSheetById(sheetId);
+  const sheet = getSheet(sheetId);
   if (!sheet) {
     throw new Error(`Sheet with ID ${sheetId} not found`);
   }
@@ -73,13 +117,25 @@ export function getSheetCell(sheetId: number, cellId: string) {
  * Update a cell in a sheet
  */
 export function updateSheetCell(sheetId: number, cellId: string, updates: Partial<CellData>) {
-  const sheet = getSheetById(sheetId);
+  const sheet = getSheet(sheetId);
   if (!sheet) {
     throw new Error(`Sheet with ID ${sheetId} not found`);
   }
   
   sheet.updateCell(cellId, updates);
   const updatedCell = sheet.getCell(cellId);
+  
+  // Cache the updated cell and sheet
+  if (updatedCell) {
+    const cellData = updatedCell.toCellData();
+    cacheCellData(sheetId, cellId, cellData).catch(error => {
+      console.warn(`[SheetController] Failed to cache cell ${cellId} in sheet ${sheetId}:`, error);
+    });
+    
+    cacheSheet(sheetId, sheet.toJSON()).catch(error => {
+      console.warn(`[SheetController] Failed to cache sheet ${sheetId} after cell update:`, error);
+    });
+  }
   
   return updatedCell ? updatedCell.toCellData() : null;
 }
@@ -88,12 +144,24 @@ export function updateSheetCell(sheetId: number, cellId: string, updates: Partia
  * Delete a cell from a sheet
  */
 export function deleteSheetCell(sheetId: number, cellId: string) {
-  const sheet = getSheetById(sheetId);
+  const sheet = getSheet(sheetId);
   if (!sheet) {
     throw new Error(`Sheet with ID ${sheetId} not found`);
   }
   
   const success = sheet.deleteCell(cellId);
+  
+  if (success) {
+    // Update cache
+    deleteCellFromCache(sheetId, cellId).catch(error => {
+      console.warn(`[SheetController] Failed to delete cell ${cellId} from cache:`, error);
+    });
+    
+    cacheSheet(sheetId, sheet.toJSON()).catch(error => {
+      console.warn(`[SheetController] Failed to cache sheet ${sheetId} after cell deletion:`, error);
+    });
+  }
+  
   return { success };
 }
 
@@ -101,7 +169,7 @@ export function deleteSheetCell(sheetId: number, cellId: string) {
  * Get sheet data as JSON
  */
 export function getSheetData(id: number) {
-  const sheet = getSheetById(id);
+  const sheet = getSheet(id);
   if (!sheet) {
     throw new Error(`Sheet with ID ${id} not found`);
   }
@@ -121,7 +189,7 @@ export function getAllSheets() {
  * Update sheet data
  */
 export function updateSheet(id: number, updates: Partial<SheetData>) {
-  const sheet = getSheetById(id);
+  const sheet = getSheet(id);
   if (!sheet) {
     throw new Error(`Sheet with ID ${id} not found`);
   }
@@ -135,6 +203,11 @@ export function updateSheet(id: number, updates: Partial<SheetData>) {
       sheet.updateCell(cellId, cellData);
     });
   }
+  
+  // Cache the updated sheet
+  cacheSheet(id, sheet.toJSON()).catch(error => {
+    console.warn(`[SheetController] Failed to cache sheet ${id} after update:`, error);
+  });
   
   return { success: true, sheet: sheet.toJSON() };
 } 

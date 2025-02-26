@@ -1,7 +1,12 @@
 import { Application } from '../models/application';
+import { 
+  initializeCache, 
+  cacheApplicationState, 
+  getApplicationState as getCachedAppState 
+} from '../services/cache.service';
 
 // Create a single application instance to be used throughout the app
-const appInstance = new Application();
+const app = new Application();
 let initialized = false;
 
 /**
@@ -10,13 +15,33 @@ let initialized = false;
 export async function initializeApplication() {
   if (initialized) {
     console.log('[ApplicationController] Application already initialized');
-    return appInstance;
+    return app;
   }
   
   console.log('[ApplicationController] Initializing application');
-  await appInstance.initialize();
+  
+  // Initialize cache service first
+  await initializeCache();
+  
+  // Try to restore from cache
+  const cachedState = await getCachedAppState();
+  if (cachedState) {
+    console.log('[ApplicationController] Restoring from cached state');
+    app.fromJSON(cachedState);
+  } else {
+    console.log('[ApplicationController] No cached state found, initializing with defaults');
+    await app.initialize();
+    
+    // Cache the initial state
+    try {
+      await cacheApplicationState(app.toJSON());
+    } catch (error) {
+      console.warn('[ApplicationController] Failed to cache initial state:', error);
+    }
+  }
+  
   initialized = true;
-  return appInstance;
+  return app;
 }
 
 /**
@@ -30,42 +55,50 @@ export function getApplication() {
       console.error('[ApplicationController] Failed to initialize application:', err);
     });
   }
-  return appInstance;
+  return app;
 }
 
 /**
  * Get application version
  */
 export function getApplicationVersion() {
-  return appInstance.version;
+  return app.version;
 }
 
 /**
  * Update application version
  */
 export function updateApplicationVersion(version: string) {
-  appInstance.version = version;
-  return appInstance.version;
+  app.version = version;
+  // Cache the updated state
+  cacheApplicationState(app.toJSON()).catch(err => {
+    console.warn('[ApplicationController] Failed to cache updated version:', err);
+  });
+  return app.version;
 }
 
 /**
  * Get company ID
  */
 export function getCompanyId() {
-  return appInstance.companyId;
+  return app.companyId;
 }
 
 /**
  * Get application state as JSON
  */
 export function getApplicationState() {
-  return appInstance.toJSON();
+  return app.toJSON();
 }
 
 /**
  * Restore application from JSON data
  */
 export function restoreApplicationState(data: any) {
-  appInstance.fromJSON(data);
-  return appInstance;
+  app.fromJSON(data);
+  // Cache the restored state
+  cacheApplicationState(app.toJSON()).catch(err => {
+    console.warn('[ApplicationController] Failed to cache restored state:', err);
+  });
+  return app;
 } 

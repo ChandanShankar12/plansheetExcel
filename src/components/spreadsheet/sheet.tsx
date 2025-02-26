@@ -2,9 +2,10 @@
 
 import { useSpreadsheet } from '@/context/spreadsheet-context';
 import { useState, useCallback, memo, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Cell from './cell';
 import { Selection } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 // Constants
 const COLUMNS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
@@ -83,6 +84,23 @@ const GridRow = memo(function GridRow({
   onCellClick,
 }: GridRowProps) {
   const { activeSheet, updateCell } = useSpreadsheet();
+  const { toast } = useToast();
+  
+  const handleCellChange = useCallback(async (cellId: string, value: string) => {
+    try {
+      if (!activeSheet) return;
+      
+      // Cell update is handled by the Cell component itself
+      console.log(`[GridRow] Cell ${cellId} changed to: ${value}`);
+    } catch (error) {
+      console.error(`[GridRow] Failed to update cell ${cellId}:`, error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update cell',
+        variant: 'destructive',
+      });
+    }
+  }, [activeSheet, toast]);
   
   return (
     <div className="flex">
@@ -100,7 +118,7 @@ const GridRow = memo(function GridRow({
               data={cellData}
               isActive={activeCell === id}
               onClick={() => onCellClick(id)}
-              onChange={(value) => updateCell(id, { value })}
+              onChange={(value) => handleCellChange(id, value)}
             />
           );
         })}
@@ -117,8 +135,11 @@ export const Sheet = memo(function Sheet() {
     selection,
     isTransitioning,
     setActiveCell,
-    setSelection 
+    setSelection,
+    saveWorkbook
   } = useSpreadsheet();
+  const [isSelecting, setIsSelecting] = useState(false);
+  const { toast } = useToast();
 
   const handleCellClick = useCallback((id: string) => {
     setActiveCell(id);
@@ -126,8 +147,21 @@ export const Sheet = memo(function Sheet() {
   }, [setActiveCell, setSelection]);
 
   const handleMouseUp = useCallback(() => {
-    // Handle mouse up event
+    setIsSelecting(false);
   }, []);
+
+  // Auto-save workbook periodically
+  useEffect(() => {
+    const saveInterval = setInterval(() => {
+      if (activeSheet) {
+        saveWorkbook().catch(error => {
+          console.error('[Sheet] Auto-save failed:', error);
+        });
+      }
+    }, 60000); // Save every minute
+    
+    return () => clearInterval(saveInterval);
+  }, [activeSheet, saveWorkbook]);
 
   useEffect(() => {
     document.addEventListener('mouseup', handleMouseUp);
@@ -173,7 +207,9 @@ export const Sheet = memo(function Sheet() {
         </div>
       </div>
 
-      {isTransitioning && <LoadingOverlay />}
+      <AnimatePresence>
+        {isTransitioning && <LoadingOverlay />}
+      </AnimatePresence>
     </div>
   );
 });
