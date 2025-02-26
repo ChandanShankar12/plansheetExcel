@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         console.log(`[API/Workbook/Save] Cached sheet: ${sheetData.id}`);
       }
     }
-    
+     
     // Cache the workbook state AFTER caching all sheets
     // This ensures the workbook has references to all sheets
     await cacheWorkbook(workbookData);
