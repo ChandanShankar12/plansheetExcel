@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       sheetsCount: workbookData.sheets?.length || 0,
       sheetIds: workbookData.sheets?.map(s => s.id) || []
     });
-    
+     
     // Get all sheets to ensure we have the latest data
     const sheets = await getSheets();
     
